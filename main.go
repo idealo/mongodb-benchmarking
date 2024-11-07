@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	// Configurable parameters
+
 	var threads int
 	var docCount int
 	var uri string
@@ -30,7 +30,6 @@ func main() {
 	flag.StringVar(&testType, "type", "insert", "Test type: insert or update")
 	flag.Parse()
 
-	// Connect to MongoDB
 	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
 	if err != nil {
 		log.Fatalf("Failed to connect to MongoDB: %v", err)
@@ -39,7 +38,6 @@ func main() {
 
 	collection := client.Database("benchmarking").Collection("testdata")
 
-	// Drop collection only for insert tests, to start fresh
 	if testType == "insert" {
 		if err := collection.Drop(context.Background()); err != nil {
 			log.Fatalf("Failed to drop collection: %v", err)
@@ -49,22 +47,16 @@ func main() {
 		log.Println("Starting update test...")
 	}
 
-	// Metrics setup
 	insertRate := metrics.NewMeter()
 
-	// Create a slice to store CSV rows in memory
 	var records [][]string
-	// Add CSV header
 	records = append(records, []string{"t", "count", "mean", "m1_rate", "m5_rate", "m15_rate", "mean_rate"})
 
-	// Set up a ticker to log the insert rate every second
 	secondTicker := time.NewTicker(1 * time.Second)
 	defer secondTicker.Stop()
 
-	// Goroutine to log the insert/update rate to memory every second
 	go func() {
 		for range secondTicker.C {
-			// Capture statistics at this second
 			timestamp := time.Now().Unix()
 			count := insertRate.Count()
 			mean := insertRate.RateMean()
@@ -72,11 +64,9 @@ func main() {
 			m5Rate := insertRate.Rate5()
 			m15Rate := insertRate.Rate15()
 
-			// Log the insert/update rate to the console
 			log.Printf("Timestamp: %d, Document Count: %d, Mean Rate: %.2f docs/sec, m1_rate: %.2f, m5_rate: %.2f, m15_rate: %.2f",
 				timestamp, count, mean, m1Rate, m5Rate, m15Rate)
 
-			// Append current second stats to the in-memory slice
 			record := []string{
 				fmt.Sprintf("%d", timestamp),
 				fmt.Sprintf("%d", count),
@@ -84,13 +74,12 @@ func main() {
 				fmt.Sprintf("%.6f", m1Rate),
 				fmt.Sprintf("%.6f", m5Rate),
 				fmt.Sprintf("%.6f", m15Rate),
-				fmt.Sprintf("%.6f", mean), // mean_rate added to CSV
+				fmt.Sprintf("%.6f", mean),
 			}
 			records = append(records, record)
 		}
 	}()
 
-	// Start concurrent operations based on the test type
 	var wg sync.WaitGroup
 	wg.Add(threads)
 
@@ -103,7 +92,6 @@ func main() {
 
 				switch testType {
 				case "insert":
-					// Insert a new document
 					doc := bson.M{
 						"_id":            docID,
 						"threadId":       threadID,
@@ -119,7 +107,6 @@ func main() {
 					}
 
 				case "update":
-					// Update an existing document
 					filter := bson.M{"_id": docID}
 					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
 					_, err := collection.UpdateOne(context.Background(), filter, update)
@@ -133,10 +120,8 @@ func main() {
 		}(i)
 	}
 
-	// Wait for all goroutines to finish
 	wg.Wait()
 
-	// Write all collected records to CSV after the test finishes
 	filename := fmt.Sprintf("benchmark_results_%s.csv", testType)
 	file, err := os.Create(filename)
 	if err != nil {

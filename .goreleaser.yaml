@@ -1,0 +1,22 @@
+project_name: ec2ctl
+
+builds:
+  - env: [ CGO_ENABLED=0 ]
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags: -X github.com/idealo/ec2ctl/cmd.Version={{.Version}}
+    id: "ec2ctl"
+    dir: .
+    main: .
+
+release:
+  draft: false
+
+changelog:
+  skip: false
+  use: git
+  sort: asc

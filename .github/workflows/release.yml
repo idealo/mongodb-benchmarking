@@ -1,0 +1,45 @@
+name: Release and Publish
+
+on:
+  schedule:
+    - cron: '0 1 */14 * *' # Runs every 2 weeks
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions: write-all
+
+jobs:
+  release_and_publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Semantic Release
+        uses: cycjimmy/semantic-release-action@v4
+        id: semantic
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout
+        if: steps.semantic.outputs.new_release_published == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git fetch --force --tags
+        if: steps.semantic.outputs.new_release_published == 'true'
+      - name: Setup Go
+        if: steps.semantic.outputs.new_release_published == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '>=1.22.1'
+          cache: true
+      - name: Build Go Package
+        if: steps.semantic.outputs.new_release_published == 'true'
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

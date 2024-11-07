@@ -1,13 +1,9 @@
-# Makefile for mongo-bench
-
-# Go parameters
 GOCMD=go
 GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 BINARY_NAME=mongo-bench
 MAIN_FILE=main.go
 
-# Build the application
 .PHONY: all
 all: build
 
@@ -15,23 +11,18 @@ build:
 	$(GOBUILD) -o $(BINARY_NAME) $(MAIN_FILE)
 	@echo "Build complete: $(BINARY_NAME)"
 
-# Run the application with configurable parameters
-# Usage example: make run THREADS=10 DOCS=10000 URI=mongodb://localhost:27017
 run:
 	@echo "Running $(BINARY_NAME) with THREADS=$(THREADS), DOCS=$(DOCS), URI=$(URI)"
 	./$(BINARY_NAME) -threads $(THREADS) -docs $(DOCS) -uri $(URI)
 
-# Clean up the binary
 clean:
 	$(GOCLEAN)
 	rm -f $(BINARY_NAME)
 	@echo "Clean complete"
 
-# Run tests (if any tests are added in the future)
 test:
 	$(GOTEST) -v ./...
 
-# Help command to show usage
 help:
 	@echo "Usage:"
 	@echo "  make          - Builds the binary"

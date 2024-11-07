@@ -1,4 +1,4 @@
-project_name: ec2ctl
+project_name: mongo-bench
 
 builds:
   - env: [ CGO_ENABLED=0 ]
@@ -8,8 +8,7 @@ builds:
     goarch:
       - amd64
       - arm64
-    ldflags: -X github.com/idealo/ec2ctl/cmd.Version={{.Version}}
-    id: "ec2ctl"
+    id: "mongo-bench"
     dir: .
     main: .
 

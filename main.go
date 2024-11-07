@@ -18,13 +18,16 @@ import (
 )
 
 func main() {
+
 	var threads int
 	var docCount int
 	var uri string
+	var testType string
 
-	flag.IntVar(&threads, "threads", 10, "Number of threads for inserting documents")
-	flag.IntVar(&docCount, "docs", 1000, "Total number of documents to insert")
+	flag.IntVar(&threads, "threads", 10, "Number of threads for inserting or updating documents")
+	flag.IntVar(&docCount, "docs", 1000, "Total number of documents to insert or update")
 	flag.StringVar(&uri, "uri", "mongodb://localhost:27017", "MongoDB URI")
+	flag.StringVar(&testType, "type", "insert", "Test type: insert or update")
 	flag.Parse()
 
 	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
@@ -35,11 +38,14 @@ func main() {
 
 	collection := client.Database("benchmarking").Collection("testdata")
 
-	err = collection.Drop(context.Background())
-	if err != nil {
-		log.Fatalf("Failed to drop collection: %v", err)
+	if testType == "insert" {
+		if err := collection.Drop(context.Background()); err != nil {
+			log.Fatalf("Failed to drop collection: %v", err)
+		}
+		log.Println("Collection dropped. Starting new insert test...")
+	} else {
+		log.Println("Starting update test...")
 	}
-	log.Println("Collection dropped. Starting new benchmark test...")
 
 	insertRate := metrics.NewMeter()
 
@@ -58,7 +64,7 @@ func main() {
 			m5Rate := insertRate.Rate5()
 			m15Rate := insertRate.Rate15()
 
-			log.Printf("Timestamp: %d, Insert Count: %d, Mean Rate: %.2f docs/sec, m1_rate: %.2f, m5_rate: %.2f, m15_rate: %.2f",
+			log.Printf("Timestamp: %d, Document Count: %d, Mean Rate: %.2f docs/sec, m1_rate: %.2f, m5_rate: %.2f, m15_rate: %.2f",
 				timestamp, count, mean, m1Rate, m5Rate, m15Rate)
 
 			record := []string{
@@ -68,7 +74,7 @@ func main() {
 				fmt.Sprintf("%.6f", m1Rate),
 				fmt.Sprintf("%.6f", m5Rate),
 				fmt.Sprintf("%.6f", m15Rate),
-				fmt.Sprintf("%.6f", mean), // mean_rate added to CSV
+				fmt.Sprintf("%.6f", mean),
 			}
 			records = append(records, record)
 		}
@@ -80,21 +86,35 @@ func main() {
 	for i := 0; i < threads; i++ {
 		go func(threadID int) {
 			defer wg.Done()
-			threadInsertCount := docCount / threads
-			for j := 0; j < threadInsertCount; j++ {
-				doc := bson.M{
-					"_id":            rand.Int63(),
-					"threadId":       threadID,
-					"threadRunCount": 1,
-					"rnd":            rand.Int63(),
-					"v":              1,
-				}
+			threadDocCount := docCount / threads
+			for j := 0; j < threadDocCount; j++ {
+				docID := int64(threadID*threadDocCount + j)
 
-				_, err := collection.InsertOne(context.Background(), doc)
-				if err == nil {
-					insertRate.Mark(1)
-				} else {
-					log.Printf("Insert failed: %v", err)
+				switch testType {
+				case "insert":
+					doc := bson.M{
+						"_id":            docID,
+						"threadId":       threadID,
+						"threadRunCount": 1,
+						"rnd":            rand.Int63(),
+						"v":              1,
+					}
+					_, err := collection.InsertOne(context.Background(), doc)
+					if err == nil {
+						insertRate.Mark(1)
+					} else {
+						log.Printf("Insert failed: %v", err)
+					}
+
+				case "update":
+					filter := bson.M{"_id": docID}
+					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
+					_, err := collection.UpdateOne(context.Background(), filter, update)
+					if err == nil {
+						insertRate.Mark(1)
+					} else {
+						log.Printf("Update failed: %v", err)
+					}
 				}
 			}
 		}(i)
@@ -102,7 +122,8 @@ func main() {
 
 	wg.Wait()
 
-	file, err := os.Create("benchmark_results.csv")
+	filename := fmt.Sprintf("benchmark_results_%s.csv", testType)
+	file, err := os.Create(filename)
 	if err != nil {
 		log.Fatalf("Failed to create CSV file: %v", err)
 	}

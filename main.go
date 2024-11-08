@@ -87,10 +87,9 @@ func main() {
 			defer wg.Done()
 			threadDocCount := docCount / threads
 			for j := 0; j < threadDocCount; j++ {
-				docID := int64(threadID*threadDocCount + j)
-
 				switch testType {
 				case "insert":
+					docID := int64(threadID*threadDocCount + j)
 					doc := bson.M{
 						"_id":            docID,
 						"threadId":       threadID,
@@ -106,6 +105,8 @@ func main() {
 					}
 
 				case "update":
+					// Choose a random document ID within the range of `docCount`
+					docID := int64(rand.Intn(docCount))
 					filter := bson.M{"_id": docID}
 					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
 					_, err := collection.UpdateOne(context.Background(), filter, update)

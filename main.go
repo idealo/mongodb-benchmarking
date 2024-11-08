@@ -18,7 +18,6 @@ import (
 )
 
 func main() {
-
 	var threads int
 	var docCount int
 	var uri string
@@ -122,6 +121,24 @@ func main() {
 
 	wg.Wait()
 
+	timestamp := time.Now().Unix()
+	count := insertRate.Count()
+	mean := insertRate.RateMean()
+	m1Rate := insertRate.Rate1()
+	m5Rate := insertRate.Rate5()
+	m15Rate := insertRate.Rate15()
+
+	finalRecord := []string{
+		fmt.Sprintf("%d", timestamp),
+		fmt.Sprintf("%d", count),
+		fmt.Sprintf("%.6f", mean),
+		fmt.Sprintf("%.6f", m1Rate),
+		fmt.Sprintf("%.6f", m5Rate),
+		fmt.Sprintf("%.6f", m15Rate),
+		fmt.Sprintf("%.6f", mean), // mean_rate added to CSV
+	}
+	records = append(records, finalRecord)
+
 	filename := fmt.Sprintf("benchmark_results_%s.csv", testType)
 	file, err := os.Create(filename)
 	if err != nil {
@@ -135,5 +152,5 @@ func main() {
 	}
 	writer.Flush()
 
-	fmt.Println("Benchmarking completed. Check benchmark_results.csv for per-second rates.")
+	fmt.Printf("Benchmarking completed. Results saved to %s\n", filename)
 }

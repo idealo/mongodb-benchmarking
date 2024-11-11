@@ -79,6 +79,30 @@ func main() {
 		}
 	}()
 
+	var remainingDocIDs sync.Map
+
+	// Fetch all document IDs from the database to ensure they exist
+	cursor, err := collection.Find(context.Background(), bson.M{}, options.Find().SetProjection(bson.M{"_id": 1}))
+	if err != nil {
+		log.Fatalf("Failed to fetch document IDs: %v", err)
+	}
+	defer cursor.Close(context.Background())
+
+	for cursor.Next(context.Background()) {
+		var result bson.M
+		if err := cursor.Decode(&result); err != nil {
+			log.Printf("Failed to decode document: %v", err)
+			continue
+		}
+		if id, ok := result["_id"].(int64); ok {
+			remainingDocIDs.Store(id, true)
+		}
+	}
+
+	if err := cursor.Err(); err != nil {
+		log.Fatalf("Cursor error: %v", err)
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(threads)
 
@@ -128,13 +152,30 @@ func main() {
 					}
 
 				case "delete":
-					docID := int64(rand.Intn(docCount))
-					filter := bson.M{"_id": docID}
-					_, err := collection.DeleteOne(context.Background(), filter)
-					if err == nil {
-						insertRate.Mark(1)
-					} else {
-						log.Printf("Delete failed: %v", err)
+					for {
+						var docID int64
+						found := false
+
+						remainingDocIDs.Range(func(key, value interface{}) bool {
+							docID = key.(int64)
+							found = true
+							return false
+						})
+
+						if !found {
+							log.Println("No documents left to delete.")
+							return
+						}
+
+						filter := bson.M{"_id": docID}
+						result, err := collection.DeleteOne(context.Background(), filter)
+						if err != nil {
+							log.Printf("Delete failed: %v", err)
+							break
+						} else if result.DeletedCount > 0 {
+							insertRate.Mark(1)
+							remainingDocIDs.Delete(docID)
+						}
 					}
 				}
 			}

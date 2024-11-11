@@ -22,11 +22,13 @@ func main() {
 	var docCount int
 	var uri string
 	var testType string
+	var runAll bool
 
 	flag.IntVar(&threads, "threads", 10, "Number of threads for inserting, updating, upserting, or deleting documents")
 	flag.IntVar(&docCount, "docs", 1000, "Total number of documents to insert, update, upsert, or delete")
 	flag.StringVar(&uri, "uri", "mongodb://localhost:27017", "MongoDB URI")
 	flag.StringVar(&testType, "type", "insert", "Test type: insert, update, upsert, or delete")
+	flag.BoolVar(&runAll, "runAll", false, "Run all tests in order: insert, update, delete, upsert")
 	flag.Parse()
 
 	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
@@ -35,6 +37,23 @@ func main() {
 	}
 	defer client.Disconnect(context.Background())
 
+	// Run all tests in sequence if runAll flag is set
+	if runAll {
+		runTestSequence(client, threads, docCount)
+	} else {
+		// Run a single test based on testType
+		runTest(client, testType, threads, docCount)
+	}
+}
+
+func runTestSequence(client *mongo.Client, threads, docCount int) {
+	tests := []string{"insert", "update", "delete", "upsert"}
+	for _, test := range tests {
+		runTest(client, test, threads, docCount)
+	}
+}
+
+func runTest(client *mongo.Client, testType string, threads, docCount int) {
 	collection := client.Database("benchmarking").Collection("testdata")
 
 	if testType == "insert" || testType == "upsert" {
@@ -81,26 +100,28 @@ func main() {
 
 	var remainingDocIDs sync.Map
 
-	// Fetch all document IDs from the database to ensure they exist
-	cursor, err := collection.Find(context.Background(), bson.M{}, options.Find().SetProjection(bson.M{"_id": 1}))
-	if err != nil {
-		log.Fatalf("Failed to fetch document IDs: %v", err)
-	}
-	defer cursor.Close(context.Background())
-
-	for cursor.Next(context.Background()) {
-		var result bson.M
-		if err := cursor.Decode(&result); err != nil {
-			log.Printf("Failed to decode document: %v", err)
-			continue
+	if testType == "delete" {
+		// Fetch all document IDs from the database to ensure they exist
+		cursor, err := collection.Find(context.Background(), bson.M{}, options.Find().SetProjection(bson.M{"_id": 1}))
+		if err != nil {
+			log.Fatalf("Failed to fetch document IDs: %v", err)
 		}
-		if id, ok := result["_id"].(int64); ok {
-			remainingDocIDs.Store(id, true)
-		}
-	}
+		defer cursor.Close(context.Background())
 
-	if err := cursor.Err(); err != nil {
-		log.Fatalf("Cursor error: %v", err)
+		for cursor.Next(context.Background()) {
+			var result bson.M
+			if err := cursor.Decode(&result); err != nil {
+				log.Printf("Failed to decode document: %v", err)
+				continue
+			}
+			if id, ok := result["_id"].(int64); ok {
+				remainingDocIDs.Store(id, true)
+			}
+		}
+
+		if err := cursor.Err(); err != nil {
+			log.Fatalf("Cursor error: %v", err)
+		}
 	}
 
 	var wg sync.WaitGroup

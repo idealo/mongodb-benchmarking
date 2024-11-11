@@ -6,7 +6,6 @@ until nc -z mongodb 27017; do
   sleep 2
 done
 
-sleep 3000
 # Run the insert test
 echo 'Running insert test...'
 ./mongo-bench --uri mongodb://root:example@mongodb:27017 --type insert --threads 10 --docs 80000

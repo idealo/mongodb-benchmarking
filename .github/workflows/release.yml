@@ -36,7 +36,7 @@ jobs:
           cache: true
       - name: Build Go Package
         if: steps.semantic.outputs.new_release_published == 'true'
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
           version: latest

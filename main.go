@@ -37,11 +37,11 @@ func main() {
 
 	collection := client.Database("benchmarking").Collection("testdata")
 
-	if testType == "insert" {
+	if testType == "insert" || testType == "upsert" {
 		if err := collection.Drop(context.Background()); err != nil {
 			log.Fatalf("Failed to drop collection: %v", err)
 		}
-		log.Println("Collection dropped. Starting new insert test...")
+		log.Println("Collection dropped. Starting new rate test...")
 	} else {
 		log.Printf("Starting %s test...\n", testType)
 	}
@@ -140,7 +140,7 @@ func main() {
 					}
 
 				case "upsert":
-					docID := int64(rand.Intn(docCount))
+					docID := int64(rand.Intn(docCount / 2))
 					filter := bson.M{"_id": docID}
 					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
 					opts := options.Update().SetUpsert(true)

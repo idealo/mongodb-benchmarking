@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    networks:
+      - mongo-network
+
+  mongo-bench:
+    build:
+      context: .
+    container_name: mongo-bench
+    depends_on:
+      - mongodb
+    networks:
+      - mongo-network
+    entrypoint: ["/app/mongo-bench-entrypoint.sh"]
+      
+      
+
+networks:
+  mongo-network:
+    driver: bridge

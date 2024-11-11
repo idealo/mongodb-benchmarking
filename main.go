@@ -23,10 +23,10 @@ func main() {
 	var uri string
 	var testType string
 
-	flag.IntVar(&threads, "threads", 10, "Number of threads for inserting or updating documents")
-	flag.IntVar(&docCount, "docs", 1000, "Total number of documents to insert or update")
+	flag.IntVar(&threads, "threads", 10, "Number of threads for inserting, updating, upserting, or deleting documents")
+	flag.IntVar(&docCount, "docs", 1000, "Total number of documents to insert, update, upsert, or delete")
 	flag.StringVar(&uri, "uri", "mongodb://localhost:27017", "MongoDB URI")
-	flag.StringVar(&testType, "type", "insert", "Test type: insert or update")
+	flag.StringVar(&testType, "type", "insert", "Test type: insert, update, upsert, or delete")
 	flag.Parse()
 
 	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
@@ -43,7 +43,7 @@ func main() {
 		}
 		log.Println("Collection dropped. Starting new insert test...")
 	} else {
-		log.Println("Starting update test...")
+		log.Printf("Starting %s test...\n", testType)
 	}
 
 	insertRate := metrics.NewMeter()
@@ -105,7 +105,6 @@ func main() {
 					}
 
 				case "update":
-					// Choose a random document ID within the range of `docCount`
 					docID := int64(rand.Intn(docCount))
 					filter := bson.M{"_id": docID}
 					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
@@ -114,6 +113,28 @@ func main() {
 						insertRate.Mark(1)
 					} else {
 						log.Printf("Update failed: %v", err)
+					}
+
+				case "upsert":
+					docID := int64(rand.Intn(docCount))
+					filter := bson.M{"_id": docID}
+					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
+					opts := options.Update().SetUpsert(true)
+					_, err := collection.UpdateOne(context.Background(), filter, update, opts)
+					if err == nil {
+						insertRate.Mark(1)
+					} else {
+						log.Printf("Upsert failed: %v", err)
+					}
+
+				case "delete":
+					docID := int64(rand.Intn(docCount))
+					filter := bson.M{"_id": docID}
+					_, err := collection.DeleteOne(context.Background(), filter)
+					if err == nil {
+						insertRate.Mark(1)
+					} else {
+						log.Printf("Delete failed: %v", err)
 					}
 				}
 			}
@@ -136,7 +157,6 @@ func main() {
 		fmt.Sprintf("%.6f", m1Rate),
 		fmt.Sprintf("%.6f", m5Rate),
 		fmt.Sprintf("%.6f", m15Rate),
-		fmt.Sprintf("%.6f", mean), // mean_rate added to CSV
 	}
 	records = append(records, finalRecord)
 

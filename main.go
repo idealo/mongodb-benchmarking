@@ -17,6 +17,73 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// CollectionAPI defines an interface for MongoDB operations, allowing for testing
+type CollectionAPI interface {
+	InsertOne(ctx context.Context, document interface{}) (*mongo.InsertOneResult, error)
+	UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error)
+	DeleteOne(ctx context.Context, filter interface{}) (*mongo.DeleteResult, error)
+	CountDocuments(ctx context.Context, filter interface{}) (int64, error)
+	Drop(ctx context.Context) error
+	Find(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (*mongo.Cursor, error)
+}
+
+// MongoDBCollection is a wrapper around mongo.Collection to implement CollectionAPI
+type MongoDBCollection struct {
+	*mongo.Collection
+}
+
+func (c *MongoDBCollection) InsertOne(ctx context.Context, document interface{}) (*mongo.InsertOneResult, error) {
+	return c.Collection.InsertOne(ctx, document)
+}
+
+func (c *MongoDBCollection) UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+	return c.Collection.UpdateOne(ctx, filter, update, opts...)
+}
+
+func (c *MongoDBCollection) DeleteOne(ctx context.Context, filter interface{}) (*mongo.DeleteResult, error) {
+	return c.Collection.DeleteOne(ctx, filter)
+}
+
+func (c *MongoDBCollection) CountDocuments(ctx context.Context, filter interface{}) (int64, error) {
+	return c.Collection.CountDocuments(ctx, filter)
+}
+
+func (c *MongoDBCollection) Drop(ctx context.Context) error {
+	return c.Collection.Drop(ctx)
+}
+
+func (c *MongoDBCollection) Find(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (*mongo.Cursor, error) {
+	return c.Collection.Find(ctx, filter, opts...)
+}
+
+// fetchDocumentIDs fetches all document IDs from the collection for delete operations
+func fetchDocumentIDs(collection CollectionAPI) ([]int64, error) {
+	var docIDs []int64
+
+	cursor, err := collection.Find(context.Background(), bson.M{}, options.Find().SetProjection(bson.M{"_id": 1}))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch document IDs: %v", err)
+	}
+	defer cursor.Close(context.Background())
+
+	for cursor.Next(context.Background()) {
+		var result bson.M
+		if err := cursor.Decode(&result); err != nil {
+			log.Printf("Failed to decode document: %v", err)
+			continue
+		}
+		if id, ok := result["_id"].(int64); ok {
+			docIDs = append(docIDs, id)
+		}
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, fmt.Errorf("cursor error: %v", err)
+	}
+
+	return docIDs, nil
+}
+
 func main() {
 	var threads int
 	var docCount int
@@ -37,25 +104,24 @@ func main() {
 	}
 	defer client.Disconnect(context.Background())
 
-	// Run all tests in sequence if runAll flag is set
+	collection := client.Database("benchmarking").Collection("testdata")
+	mongoCollection := &MongoDBCollection{Collection: collection}
+
 	if runAll {
-		runTestSequence(client, threads, docCount)
+		runTestSequence(mongoCollection, threads, docCount)
 	} else {
-		// Run a single test based on testType
-		runTest(client, testType, threads, docCount)
+		runTest(mongoCollection, testType, threads, docCount, fetchDocumentIDs)
 	}
 }
 
-func runTestSequence(client *mongo.Client, threads, docCount int) {
+func runTestSequence(collection CollectionAPI, threads, docCount int) {
 	tests := []string{"insert", "update", "delete", "upsert"}
 	for _, test := range tests {
-		runTest(client, test, threads, docCount)
+		runTest(collection, test, threads, docCount, fetchDocumentIDs)
 	}
 }
 
-func runTest(client *mongo.Client, testType string, threads, docCount int) {
-	collection := client.Database("benchmarking").Collection("testdata")
-
+func runTest(collection CollectionAPI, testType string, threads, docCount int, fetchDocIDs func(CollectionAPI) ([]int64, error)) {
 	if testType == "insert" || testType == "upsert" {
 		if err := collection.Drop(context.Background()); err != nil {
 			log.Fatalf("Failed to drop collection: %v", err)
@@ -66,13 +132,39 @@ func runTest(client *mongo.Client, testType string, threads, docCount int) {
 	}
 
 	insertRate := metrics.NewMeter()
-
 	var records [][]string
 	records = append(records, []string{"t", "count", "mean", "m1_rate", "m5_rate", "m15_rate", "mean_rate"})
 
+	var partitions [][]int64 // To hold the document IDs or dummy IDs, partitioned for each thread
+
+	// Prepare partitions based on test type
+	switch testType {
+	case "delete":
+		// Fetch document IDs and partition them
+		docIDs, err := fetchDocIDs(collection)
+		if err != nil {
+			log.Fatalf("Failed to fetch document IDs: %v", err)
+		}
+		partitions = make([][]int64, threads)
+		for i, id := range docIDs {
+			partitions[i%threads] = append(partitions[i%threads], id)
+		}
+
+	case "insert", "update", "upsert":
+		// Generate unique or random IDs for insert/update/upsert
+		partitions = make([][]int64, threads)
+		for i := 0; i < docCount; i++ {
+			id := int64(i)
+			if testType == "update" || testType == "upsert" {
+				id = int64(rand.Intn(docCount)) // Random ID for update/upsert
+			}
+			partitions[i%threads] = append(partitions[i%threads], id)
+		}
+	}
+
+	// Start the ticker just before starting the main workload goroutines
 	secondTicker := time.NewTicker(1 * time.Second)
 	defer secondTicker.Stop()
-
 	go func() {
 		for range secondTicker.C {
 			timestamp := time.Now().Unix()
@@ -98,50 +190,17 @@ func runTest(client *mongo.Client, testType string, threads, docCount int) {
 		}
 	}()
 
-	var remainingDocIDs sync.Map
-
-	if testType == "delete" {
-		// Fetch all document IDs from the database to ensure they exist
-		cursor, err := collection.Find(context.Background(), bson.M{}, options.Find().SetProjection(bson.M{"_id": 1}))
-		if err != nil {
-			log.Fatalf("Failed to fetch document IDs: %v", err)
-		}
-		defer cursor.Close(context.Background())
-
-		for cursor.Next(context.Background()) {
-			var result bson.M
-			if err := cursor.Decode(&result); err != nil {
-				log.Printf("Failed to decode document: %v", err)
-				continue
-			}
-			if id, ok := result["_id"].(int64); ok {
-				remainingDocIDs.Store(id, true)
-			}
-		}
-
-		if err := cursor.Err(); err != nil {
-			log.Fatalf("Cursor error: %v", err)
-		}
-	}
-
+	// Launch threads based on the specific workload type
 	var wg sync.WaitGroup
 	wg.Add(threads)
 
 	for i := 0; i < threads; i++ {
-		go func(threadID int) {
+		go func(partition []int64) {
 			defer wg.Done()
-			threadDocCount := docCount / threads
-			for j := 0; j < threadDocCount; j++ {
+			for _, docID := range partition {
 				switch testType {
 				case "insert":
-					docID := int64(threadID*threadDocCount + j)
-					doc := bson.M{
-						"_id":            docID,
-						"threadId":       threadID,
-						"threadRunCount": 1,
-						"rnd":            rand.Int63(),
-						"v":              1,
-					}
+					doc := bson.M{"_id": docID, "threadRunCount": 1, "rnd": rand.Int63(), "v": 1}
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
 						insertRate.Mark(1)
@@ -150,7 +209,6 @@ func runTest(client *mongo.Client, testType string, threads, docCount int) {
 					}
 
 				case "update":
-					docID := int64(rand.Intn(docCount))
 					filter := bson.M{"_id": docID}
 					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
 					_, err := collection.UpdateOne(context.Background(), filter, update)
@@ -161,7 +219,6 @@ func runTest(client *mongo.Client, testType string, threads, docCount int) {
 					}
 
 				case "upsert":
-					docID := int64(rand.Intn(docCount / 2))
 					filter := bson.M{"_id": docID}
 					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
 					opts := options.Update().SetUpsert(true)
@@ -173,38 +230,23 @@ func runTest(client *mongo.Client, testType string, threads, docCount int) {
 					}
 
 				case "delete":
-					for {
-						var docID int64
-						found := false
-
-						remainingDocIDs.Range(func(key, value interface{}) bool {
-							docID = key.(int64)
-							found = true
-							return false
-						})
-
-						if !found {
-							log.Println("No documents left to delete.")
-							return
-						}
-
-						filter := bson.M{"_id": docID}
-						result, err := collection.DeleteOne(context.Background(), filter)
-						if err != nil {
-							log.Printf("Delete failed: %v", err)
-							break
-						} else if result.DeletedCount > 0 {
-							insertRate.Mark(1)
-							remainingDocIDs.Delete(docID)
-						}
+					filter := bson.M{"_id": docID}
+					result, err := collection.DeleteOne(context.Background(), filter)
+					if err != nil {
+						log.Printf("Delete failed for _id %d: %v", docID, err)
+						continue // Move to next document without retrying
+					}
+					if result.DeletedCount > 0 {
+						insertRate.Mark(1)
 					}
 				}
 			}
-		}(i)
+		}(partitions[i])
 	}
 
 	wg.Wait()
 
+	// Final metrics recording
 	timestamp := time.Now().Unix()
 	count := insertRate.Count()
 	mean := insertRate.RateMean()

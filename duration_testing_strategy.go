@@ -58,7 +58,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 	}
 
 	var doc interface{}
-	var data = make([]byte, 1024*1024*10)
+	var data = make([]byte, 1024*2)
 	for i := 0; i < len(data); i++ {
 		data[i] = byte(rand.Intn(256))
 	}

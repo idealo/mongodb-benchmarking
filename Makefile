@@ -3,13 +3,12 @@ GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 BINARY_NAME=mongo-bench
-MAIN_FILE=main.go
 
 .PHONY: all
 all: build
 
 build: test
-	$(GOBUILD) -o $(BINARY_NAME) $(MAIN_FILE)
+	$(GOBUILD) -o $(BINARY_NAME) *.go
 	@echo "Build complete: $(BINARY_NAME)"
 
 run:

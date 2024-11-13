@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// MockCollection to mock MongoDB collection operations
 type MockCollection struct {
 	mock.Mock
 }
@@ -45,68 +47,99 @@ func (m *MockCollection) Find(ctx context.Context, filter interface{}, opts ...*
 	return args.Get(0).(*mongo.Cursor), args.Error(1)
 }
 
-func fetchDocumentIDsMock(_ CollectionAPI) ([]int64, error) {
-	return []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, nil
+// fetchDocumentIDsMock returns a slice of mock ObjectIDs for testing
+func fetchDocumentIDsMock(_ CollectionAPI) ([]primitive.ObjectID, error) {
+	return []primitive.ObjectID{
+		primitive.NewObjectID(),
+		primitive.NewObjectID(),
+		primitive.NewObjectID(),
+		primitive.NewObjectID(),
+		primitive.NewObjectID(),
+		primitive.NewObjectID(),
+		primitive.NewObjectID(),
+		primitive.NewObjectID(),
+		primitive.NewObjectID(),
+		primitive.NewObjectID(),
+	}, nil
 }
 
+// TestInsertOperation tests the insert operation using DocCountTestingStrategy
 func TestInsertOperation(t *testing.T) {
 	mockCollection := new(MockCollection)
-	docCount := 10
-	threads := 2
+	config := TestingConfig{
+		Threads:  2,
+		DocCount: 10,
+		DropDb:   true,
+	}
+	strategy := DocCountTestingStrategy{}
 	testType := "insert"
 
 	mockCollection.On("Drop", mock.Anything).Return(nil)
 	mockCollection.On("InsertOne", mock.Anything, mock.Anything).Return(&mongo.InsertOneResult{}, nil)
 
-	runTest(mockCollection, testType, threads, docCount, fetchDocumentIDsMock)
+	strategy.runTest(mockCollection, testType, config, fetchDocumentIDsMock)
 
 	mockCollection.AssertNumberOfCalls(t, "Drop", 1)
-	mockCollection.AssertNumberOfCalls(t, "InsertOne", docCount)
+	mockCollection.AssertNumberOfCalls(t, "InsertOne", config.DocCount)
 }
 
+// TestUpdateOperation tests the update operation using DocCountTestingStrategy
 func TestUpdateOperation(t *testing.T) {
 	mockCollection := new(MockCollection)
-	docCount := 10
-	threads := 2
+	config := TestingConfig{
+		Threads:  2,
+		DocCount: 10,
+	}
+	strategy := DocCountTestingStrategy{}
 	testType := "update"
 
 	mockCollection.On("UpdateOne", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mongo.UpdateResult{}, nil)
 
-	runTest(mockCollection, testType, threads, docCount, fetchDocumentIDsMock)
+	strategy.runTest(mockCollection, testType, config, fetchDocumentIDsMock)
 
-	expectedCalls := docCount
+	expectedCalls := config.DocCount
 	mockCollection.AssertNumberOfCalls(t, "UpdateOne", expectedCalls)
 }
 
+// TestUpsertOperation tests the upsert operation using DocCountTestingStrategy
 func TestUpsertOperation(t *testing.T) {
 	mockCollection := new(MockCollection)
-	docCount := 10
-	threads := 2
+	config := TestingConfig{
+		Threads:  2,
+		DocCount: 10,
+		DropDb:   true,
+	}
+	strategy := DocCountTestingStrategy{}
 	testType := "upsert"
 
 	mockCollection.On("Drop", mock.Anything).Return(nil)
 	mockCollection.On("UpdateOne", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mongo.UpdateResult{UpsertedCount: 1}, nil)
 
-	runTest(mockCollection, testType, threads, docCount, fetchDocumentIDsMock)
+	strategy.runTest(mockCollection, testType, config, fetchDocumentIDsMock)
 
 	mockCollection.AssertNumberOfCalls(t, "Drop", 1)
-	mockCollection.AssertNumberOfCalls(t, "UpdateOne", docCount)
+	mockCollection.AssertNumberOfCalls(t, "UpdateOne", config.DocCount)
 }
 
+// TestDeleteOperation tests the delete operation using DocCountTestingStrategy
 func TestDeleteOperation(t *testing.T) {
 	mockCollection := new(MockCollection)
-	docCount := 10
-	threads := 2
+	config := TestingConfig{
+		Threads:  2,
+		DocCount: 10,
+	}
+	strategy := DocCountTestingStrategy{}
 	testType := "delete"
 
 	mockCollection.On("DeleteOne", mock.Anything, mock.Anything).Return(&mongo.DeleteResult{DeletedCount: 1}, nil)
 
-	runTest(mockCollection, testType, threads, docCount, fetchDocumentIDsMock)
+	strategy.runTest(mockCollection, testType, config, fetchDocumentIDsMock)
 
-	expectedCalls := docCount
+	expectedCalls := config.DocCount
 	mockCollection.AssertNumberOfCalls(t, "DeleteOne", expectedCalls)
 }
 
+// TestCountDocuments verifies the CountDocuments method in isolation
 func TestCountDocuments(t *testing.T) {
 	mockCollection := new(MockCollection)
 

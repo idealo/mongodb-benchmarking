@@ -69,6 +69,7 @@ func TestInsertOperation(t *testing.T) {
 	config := TestingConfig{
 		Threads:  2,
 		DocCount: 10,
+		DropDb:   true,
 	}
 	strategy := DocCountTestingStrategy{}
 	testType := "insert"
@@ -106,6 +107,7 @@ func TestUpsertOperation(t *testing.T) {
 	config := TestingConfig{
 		Threads:  2,
 		DocCount: 10,
+		DropDb:   true,
 	}
 	strategy := DocCountTestingStrategy{}
 	testType := "upsert"

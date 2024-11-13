@@ -57,6 +57,12 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 		}
 	}
 
+	var doc interface{}
+	var data = make([]byte, 1024*1024*10)
+	for i := 0; i < len(data); i++ {
+		data[i] = byte(rand.Intn(256))
+	}
+
 	secondTicker := time.NewTicker(1 * time.Second)
 	defer secondTicker.Stop()
 	go func() {
@@ -94,8 +100,12 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 				defer wg.Done()
 
 				for time.Now().Before(endTime) {
-					// Insert without specifying an ID; MongoDB will auto-generate it
-					doc := bson.M{"rnd": rand.Int63(), "v": 1}
+					if config.LargeDocs {
+						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1, "data": data}
+
+					} else {
+						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
+					}
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
 						insertRate.Mark(1)

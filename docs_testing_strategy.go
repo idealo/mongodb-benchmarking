@@ -113,7 +113,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 				switch testType {
 				case "insert":
 					// Let MongoDB generate the _id automatically
-					doc := bson.M{"threadRunCount": 1, "rnd": rand.Int63(), "v": 1}
+					doc := bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
 						insertRate.Mark(1)

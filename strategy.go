@@ -3,9 +3,10 @@ package main
 import "go.mongodb.org/mongo-driver/bson/primitive"
 
 type TestingConfig struct {
-	Threads  int
-	DocCount int
-	Duration int
+	Threads   int
+	DocCount  int
+	Duration  int
+	LargeDocs bool
 }
 
 type TestingStrategy interface {

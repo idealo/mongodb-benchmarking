@@ -35,13 +35,17 @@ After building the tool, run it with customizable parameters:
 
 - `-threads`: Number of concurrent threads to use for inserting, updating, deleting, or upserting documents.
 - `-docs`: Total number of documents to process during the benchmark.
+- `-duration`: Duration of the test in seconds (default: 0 seconds).
+- `-largeDocs`: Use large documents (2K) (default: false).
+- `-dropDb`: Drop the database before running the test (default: true).
 - `-uri`: MongoDB connection URI.
 - `-type`: Type of test to run. Accepts `insert`, `update`, `delete`, `upsert`, or `runAll`:
   - `insert`: The tool will insert new documents.
   - `update`: The tool will update existing documents (requires that documents have been inserted in a prior run).
-  - `delete`: The tool will delete existing documents.
-  - `upsert`: The tool will perform upserts, repeatedly updating a specified range.
-  - `runAll`: Runs the `insert`, `update`, `delete`, and `upsert` tests sequentially.
+  - `delete`: The tool will delete existing documents. (just if `docs` is given)
+  - `upsert`: The tool will perform upserts, repeatedly updating a specified range. (just if `docs` is given)
+  - `runAll`: Runs the `insert`, `update`, `delete`, and `upsert` tests sequentially. (just if `docs` is given)
+  - `runAll`: Runs the `insert`, `update` tests sequentially. (just if `duration` is given)
 
 ### Example Commands
 

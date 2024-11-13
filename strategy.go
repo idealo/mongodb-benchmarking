@@ -7,6 +7,7 @@ type TestingConfig struct {
 	DocCount  int
 	Duration  int
 	LargeDocs bool
+	DropDb    bool
 }
 
 type TestingStrategy interface {

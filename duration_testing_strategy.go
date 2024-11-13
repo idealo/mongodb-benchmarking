@@ -36,10 +36,14 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 	var partitions [][]primitive.ObjectID
 	if testType == "insert" {
-		if err := collection.Drop(context.Background()); err != nil {
-			log.Fatalf("Failed to clear collection before test: %v", err)
+		if config.DropDb {
+			if err := collection.Drop(context.Background()); err != nil {
+				log.Fatalf("Failed to clear collection before test: %v", err)
+			}
+			log.Println("Collection cleared before insert test.")
+		} else {
+			log.Println("Collection stays. Dropping disabled.")
 		}
-		log.Println("Collection cleared before insert test.")
 	} else if testType == "update" {
 		docIDs, err := fetchDocIDs(collection)
 		if err != nil {

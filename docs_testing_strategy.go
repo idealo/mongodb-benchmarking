@@ -26,10 +26,14 @@ func (t DocCountTestingStrategy) runTestSequence(collection CollectionAPI, confi
 
 func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI) ([]primitive.ObjectID, error)) {
 	if testType == "insert" || testType == "upsert" {
-		if err := collection.Drop(context.Background()); err != nil {
-			log.Fatalf("Failed to drop collection: %v", err)
+		if config.DropDb {
+			if err := collection.Drop(context.Background()); err != nil {
+				log.Fatalf("Failed to drop collection: %v", err)
+			}
+			log.Println("Collection dropped. Starting new rate test...")
+		} else {
+			log.Println("Collection stays. Dropping disabled.")
 		}
-		log.Println("Collection dropped. Starting new rate test...")
 	} else {
 		log.Printf("Starting %s test...\n", testType)
 	}

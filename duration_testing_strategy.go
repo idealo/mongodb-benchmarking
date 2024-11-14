@@ -25,15 +25,6 @@ func (t DurationTestingStrategy) runTestSequence(collection CollectionAPI, confi
 }
 
 func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI, int64, string) ([]primitive.ObjectID, error)) {
-	// Set up the timer for the duration of the test
-	endTime := time.Now().Add(time.Duration(config.Duration) * time.Second)
-
-	// Set up the ticker to record metrics every second
-	insertRate := metrics.NewMeter()
-	records := [][]string{
-		{"timestamp", "count", "mean_rate", "m1_rate", "m5_rate", "m15_rate"},
-	}
-
 	var partitions [][]primitive.ObjectID
 	if testType == "insert" {
 		if config.DropDb {
@@ -67,6 +58,9 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 		data[i] = byte(rand.Intn(256))
 	}
 
+	endTime := time.Now().Add(time.Duration(config.Duration) * time.Second)
+	insertRate := metrics.NewMeter()
+	records := [][]string{{"timestamp", "count", "mean_rate", "m1_rate", "m5_rate", "m15_rate"}}
 	secondTicker := time.NewTicker(1 * time.Second)
 	defer secondTicker.Stop()
 	go func() {

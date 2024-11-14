@@ -60,6 +60,8 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 		go fetchDocIDs(collection, docIDChannel, testType)
 
+		time.Sleep(30 * time.Second)
+
 		go func() {
 			i := 0
 			for id := range docIDChannel {

@@ -38,10 +38,6 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 		log.Printf("Starting %s test...\n", testType)
 	}
 
-	insertRate := metrics.NewMeter()
-	var records [][]string
-	records = append(records, []string{"t", "count", "mean", "m1_rate", "m5_rate", "m15_rate", "mean_rate"})
-
 	var partitions [][]primitive.ObjectID
 
 	var threads = config.Threads
@@ -80,6 +76,10 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	}
 
 	// Start the ticker just before starting the main workload goroutines
+	insertRate := metrics.NewMeter()
+	var records [][]string
+	records = append(records, []string{"t", "count", "mean", "m1_rate", "m5_rate", "m15_rate", "mean_rate"})
+
 	secondTicker := time.NewTicker(1 * time.Second)
 	defer secondTicker.Stop()
 	go func() {

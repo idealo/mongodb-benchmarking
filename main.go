@@ -58,8 +58,10 @@ func main() {
 	} else {
 		strategy = DocCountTestingStrategy{}
 		config = TestingConfig{
-			Threads:  threads,
-			DocCount: docCount,
+			Threads:   threads,
+			DocCount:  docCount,
+			LargeDocs: largeDocs,
+			DropDb:    dropDb,
 		}
 		if runAll {
 			strategy.runTestSequence(mongoCollection, config)

@@ -80,6 +80,12 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	var records [][]string
 	records = append(records, []string{"t", "count", "mean", "m1_rate", "m5_rate", "m15_rate", "mean_rate"})
 
+	var doc interface{}
+	var data = make([]byte, 1024*2)
+	for i := 0; i < len(data); i++ {
+		data[i] = byte(rand.Intn(256))
+	}
+
 	secondTicker := time.NewTicker(1 * time.Second)
 	defer secondTicker.Stop()
 	go func() {
@@ -116,15 +122,17 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 			for _, docID := range partition {
 				switch testType {
 				case "insert":
-					// Let MongoDB generate the _id automatically
-					doc := bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
+					if config.LargeDocs {
+						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1, "data": data}
+					} else {
+						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
+					}
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
 						insertRate.Mark(1)
 					} else {
 						log.Printf("Insert failed: %v", err)
 					}
-
 				case "update":
 					randomDocID := partition[rand.Intn(len(partition))]
 					filter := bson.M{"_id": randomDocID}

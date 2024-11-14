@@ -162,6 +162,8 @@ func fetchSampledDocIDs(collection CollectionAPI, docIDChannel chan<- primitive.
 				totalFetched++
 			}
 
+			log.Println("Fetched", totalFetched, "document IDs")
+
 			if err := cursor.Err(); err != nil {
 				log.Printf("Cursor error: %v", err)
 			}

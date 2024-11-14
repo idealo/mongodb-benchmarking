@@ -69,7 +69,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 			}(i)
 		}
 	} else if testType == "update" {
-		docIDChannel := make(chan primitive.ObjectID, 40000)
+		docIDChannel := make(chan primitive.ObjectID, 400000)
 
 		go fetchDocIDs(collection, docIDChannel, testType)
 

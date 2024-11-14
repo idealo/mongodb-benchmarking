@@ -88,7 +88,7 @@ func fetchSampledDocIDs(collection CollectionAPI, docIDChannel chan<- primitive.
 	} else if testType == "delete" {
 		log.Println("Collection is large; fetching document IDs in ordered batches for deletion.")
 
-		batchSize := 40000
+		batchSize := 400000
 		totalFetched := 0
 		var lastID primitive.ObjectID
 
@@ -133,7 +133,7 @@ func fetchSampledDocIDs(collection CollectionAPI, docIDChannel chan<- primitive.
 	} else {
 		log.Println("Collection is large; fetching document IDs in random batches.")
 
-		batchSize := 40000
+		batchSize := 400000
 		totalFetched := 0
 
 		for totalFetched < int(estimatedCount) {

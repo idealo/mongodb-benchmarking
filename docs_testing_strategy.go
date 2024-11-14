@@ -51,7 +51,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 			partitions[i%threads] = append(partitions[i%threads], primitive.NewObjectID())
 		}
 	case "update", "delete":
-		docIDChannel := make(chan primitive.ObjectID, 40000)
+		docIDChannel := make(chan primitive.ObjectID, 400000)
 		partitionChannels = make([]chan primitive.ObjectID, threads)
 
 		for i := 0; i < threads; i++ {

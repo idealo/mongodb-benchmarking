@@ -24,7 +24,7 @@ func (t DurationTestingStrategy) runTestSequence(collection CollectionAPI, confi
 	}
 }
 
-func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI) ([]primitive.ObjectID, error)) {
+func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI, int64, string) ([]primitive.ObjectID, error)) {
 	// Set up the timer for the duration of the test
 	endTime := time.Now().Add(time.Duration(config.Duration) * time.Second)
 
@@ -45,7 +45,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 			log.Println("Collection stays. Dropping disabled.")
 		}
 	} else if testType == "update" {
-		docIDs, err := fetchDocIDs(collection)
+		docIDs, err := fetchDocIDs(collection, config.Limit, testType)
 		if err != nil {
 			log.Fatalf("Failed to fetch document IDs: %v", err)
 		}

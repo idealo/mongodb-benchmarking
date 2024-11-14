@@ -8,9 +8,10 @@ type TestingConfig struct {
 	Duration  int
 	LargeDocs bool
 	DropDb    bool
+	Limit     int64
 }
 
 type TestingStrategy interface {
 	runTestSequence(collection CollectionAPI, config TestingConfig)
-	runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI) ([]primitive.ObjectID, error))
+	runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI, int64, string) ([]primitive.ObjectID, error))
 }

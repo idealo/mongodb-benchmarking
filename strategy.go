@@ -12,5 +12,5 @@ type TestingConfig struct {
 
 type TestingStrategy interface {
 	runTestSequence(collection CollectionAPI, config TestingConfig)
-	runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI) ([]primitive.ObjectID, error))
+	runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI, chan<- primitive.ObjectID, string))
 }

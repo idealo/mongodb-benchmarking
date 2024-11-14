@@ -2,17 +2,15 @@ package main
 
 import (
 	"context"
-	"encoding/csv"
-	"fmt"
-	"github.com/rcrowley/go-metrics"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"math/rand"
-	"os"
 	"sync"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
 )
 
 type DocCountTestingStrategy struct{}
@@ -20,11 +18,11 @@ type DocCountTestingStrategy struct{}
 func (t DocCountTestingStrategy) runTestSequence(collection CollectionAPI, config TestingConfig) {
 	tests := []string{"insert", "update", "delete", "upsert"}
 	for _, test := range tests {
-		t.runTest(collection, test, config, fetchDocumentIDs)
+		t.runTest(collection, test, config, fetchSampledDocIDs)
 	}
 }
 
-func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI) ([]primitive.ObjectID, error)) {
+func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI, chan<- primitive.ObjectID, string)) {
 	if testType == "insert" || testType == "upsert" {
 		if config.DropDb {
 			if err := collection.Drop(context.Background()); err != nil {
@@ -39,162 +37,140 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	}
 
 	insertRate := metrics.NewMeter()
-	var records [][]string
-	records = append(records, []string{"t", "count", "mean", "m1_rate", "m5_rate", "m15_rate", "mean_rate"})
-
-	var partitions [][]primitive.ObjectID
+	records := [][]string{{"t", "count", "mean", "m1_rate", "m5_rate", "m15_rate", "mean_rate"}}
 
 	var threads = config.Threads
 	var docCount = config.DocCount
+	var partitions [][]primitive.ObjectID
+	var partitionChannels []chan primitive.ObjectID
 
-	// Prepare partitions based on test type
 	switch testType {
-	case "delete":
-		// Fetch document IDs as ObjectId and partition them
-		docIDs, err := fetchDocIDs(collection)
-		if err != nil {
-			log.Fatalf("Failed to fetch document IDs: %v", err)
-		}
-		partitions = make([][]primitive.ObjectID, threads)
-		for i, id := range docIDs {
-			partitions[i%threads] = append(partitions[i%threads], id)
-		}
-
 	case "insert", "upsert":
 		partitions = make([][]primitive.ObjectID, threads)
 		for i := 0; i < docCount; i++ {
 			partitions[i%threads] = append(partitions[i%threads], primitive.NewObjectID())
 		}
+	case "update", "delete":
+		docIDChannel := make(chan primitive.ObjectID, 40000)
+		partitionChannels = make([]chan primitive.ObjectID, threads)
 
-	case "update":
-		docIDs, err := fetchDocIDs(collection)
-		if err != nil {
-			log.Fatalf("Failed to fetch document IDs: %v", err)
+		for i := 0; i < threads; i++ {
+			partitionChannels[i] = make(chan primitive.ObjectID, docCount/threads)
 		}
 
-		partitions = make([][]primitive.ObjectID, threads)
-		for i := 0; i < len(docIDs); i++ {
-			docID := docIDs[rand.Intn(len(docIDs))]
-			partitions[i%threads] = append(partitions[i%threads], docID)
-		}
+		go fetchDocIDs(collection, docIDChannel, testType)
+
+		go func() {
+			i := 0
+			for id := range docIDChannel {
+				partitionChannels[i%threads] <- id
+				i++
+			}
+
+			for _, ch := range partitionChannels {
+				close(ch)
+			}
+		}()
 	}
 
-	// Start the ticker just before starting the main workload goroutines
 	secondTicker := time.NewTicker(1 * time.Second)
 	defer secondTicker.Stop()
 	go func() {
 		for range secondTicker.C {
-			timestamp := time.Now().Unix()
-			count := insertRate.Count()
-			mean := insertRate.RateMean()
-			m1Rate := insertRate.Rate1()
-			m5Rate := insertRate.Rate5()
-			m15Rate := insertRate.Rate15()
-
-			log.Printf("Timestamp: %d, Document Count: %d, Mean Rate: %.2f docs/sec, m1_rate: %.2f, m5_rate: %.2f, m15_rate: %.2f",
-				timestamp, count, mean, m1Rate, m5Rate, m15Rate)
-
-			record := []string{
-				fmt.Sprintf("%d", timestamp),
-				fmt.Sprintf("%d", count),
-				fmt.Sprintf("%.6f", mean),
-				fmt.Sprintf("%.6f", m1Rate),
-				fmt.Sprintf("%.6f", m5Rate),
-				fmt.Sprintf("%.6f", m15Rate),
-			}
-			records = append(records, record)
+			recordMetrics(insertRate, &records)
 		}
 	}()
 
-	// Launch threads based on the specific workload type
-	var wg sync.WaitGroup
-	wg.Add(threads)
+	switch testType {
+	case "insert", "upsert":
+		runWorkloadWithPartitions(testType, collection, partitions, insertRate)
+	case "update", "delete":
+		runWorkloadWithChannels(testType, collection, partitionChannels, insertRate)
+	}
 
-	for i := 0; i < threads; i++ {
-		go func(partition []primitive.ObjectID) {
+	finalizeMetrics(insertRate, &records, testType)
+}
+
+// runWorkloadWithPartitions runs the workload using pre-generated partitions (for `insert`)
+func runWorkloadWithPartitions(testType string, collection CollectionAPI, partitions [][]primitive.ObjectID, insertRate metrics.Meter) {
+	var wg sync.WaitGroup
+	wg.Add(len(partitions))
+
+	for threadID, partition := range partitions {
+		go func(threadID int) {
 			defer wg.Done()
-			for _, docID := range partition {
+			for range partition {
 				switch testType {
 				case "insert":
-					// Let MongoDB generate the _id automatically
-					doc := bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
-					_, err := collection.InsertOne(context.Background(), doc)
-					if err == nil {
+					doc := bson.M{"threadRunCount": threadID, "rnd": rand.Int63(), "v": 1}
+					if _, err := collection.InsertOne(context.Background(), doc); err == nil {
 						insertRate.Mark(1)
 					} else {
 						log.Printf("Insert failed: %v", err)
 					}
+				case "upsert":
+					docID := partition[rand.Intn(len(partition)/2)]
+					filter := bson.M{"_id": docID}
+					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
+					opts := options.Update().SetUpsert(true)
+					if _, err := collection.UpdateOne(context.Background(), filter, update, opts); err == nil {
+						insertRate.Mark(1)
+					} else {
+						log.Printf("Upsert failed for _id %v: %v", docID, err)
+					}
+				}
+			}
+		}(threadID)
+	}
 
+	wg.Wait()
+}
+
+// runWorkloadWithChannels runs the workload using partition channels (for `update`, `delete`, `upsert`)
+func runWorkloadWithChannels(testType string, collection CollectionAPI, partitionChannels []chan primitive.ObjectID, insertRate metrics.Meter) {
+	var wg sync.WaitGroup
+	wg.Add(len(partitionChannels))
+
+	for threadID, partition := range partitionChannels {
+		go func(threadID int, partition <-chan primitive.ObjectID) {
+			defer wg.Done()
+			for docID := range partition {
+				switch testType {
 				case "update":
 					filter := bson.M{"_id": docID}
 					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
-					_, err := collection.UpdateOne(context.Background(), filter, update)
-					if err == nil {
+					if _, err := collection.UpdateOne(context.Background(), filter, update); err == nil {
 						insertRate.Mark(1)
 					} else {
 						log.Printf("Update failed for _id %v: %v", docID, err)
 					}
 
 				case "upsert":
-					randomDocID := partition[rand.Intn(len(partition)/2)]
-					filter := bson.M{"_id": randomDocID}
+					filter := bson.M{"_id": docID}
 					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
 					opts := options.Update().SetUpsert(true)
-					_, err := collection.UpdateOne(context.Background(), filter, update, opts)
-					if err == nil {
+					if _, err := collection.UpdateOne(context.Background(), filter, update, opts); err == nil {
 						insertRate.Mark(1)
 					} else {
 						log.Printf("Upsert failed for _id %v: %v", docID, err)
 					}
 
 				case "delete":
-					// Use ObjectId in the filter for delete
 					filter := bson.M{"_id": docID}
-					result, err := collection.DeleteOne(context.Background(), filter)
-					if err != nil {
-						log.Printf("Delete failed for _id %v: %v", docID, err)
-						continue // Move to next document without retrying
-					}
-					if result.DeletedCount > 0 {
+					if result, err := collection.DeleteOne(context.Background(), filter); err == nil && result.DeletedCount > 0 {
 						insertRate.Mark(1)
+					} else {
+						log.Printf("Delete failed for _id %v: %v", docID, err)
 					}
 				}
 			}
-		}(partitions[i])
+		}(threadID, partition)
 	}
 
 	wg.Wait()
+}
 
-	// Final metrics recording
-	timestamp := time.Now().Unix()
-	count := insertRate.Count()
-	mean := insertRate.RateMean()
-	m1Rate := insertRate.Rate1()
-	m5Rate := insertRate.Rate5()
-	m15Rate := insertRate.Rate15()
-
-	finalRecord := []string{
-		fmt.Sprintf("%d", timestamp),
-		fmt.Sprintf("%d", count),
-		fmt.Sprintf("%.6f", mean),
-		fmt.Sprintf("%.6f", m1Rate),
-		fmt.Sprintf("%.6f", m5Rate),
-		fmt.Sprintf("%.6f", m15Rate),
-	}
-	records = append(records, finalRecord)
-
-	filename := fmt.Sprintf("benchmark_results_%s.csv", testType)
-	file, err := os.Create(filename)
-	if err != nil {
-		log.Fatalf("Failed to create CSV file: %v", err)
-	}
-	defer file.Close()
-
-	writer := csv.NewWriter(file)
-	if err := writer.WriteAll(records); err != nil {
-		log.Fatalf("Failed to write records to CSV: %v", err)
-	}
-	writer.Flush()
-
-	fmt.Printf("Benchmarking completed. Results saved to %s\n", filename)
+func finalizeMetrics(insertRate metrics.Meter, records *[][]string, testType string) {
+	recordMetrics(insertRate, records)
+	saveMetricsToCSV(*records, testType)
 }

@@ -35,7 +35,7 @@ fi
 
 # Run the upsert test
 echo 'Running upsert test...'
-./mongo-bench --uri mongodb://root:example@mongodb:27017 --type upsert --threads 10 --docs 80000
+./mongo-bench --uri mongodb://root:example@mongodb:27017 --type upsert --threads 10 --docs 80000 --dropDb=false
 
 echo 'Checking document count...'
 DOC_COUNT=$(mongosh 'mongodb://root:example@mongodb:27017/?authSource=admin' --quiet --eval 'JSON.stringify({count: db.getSiblingDB("benchmarking").testdata.countDocuments()})' | jq -r '.count')

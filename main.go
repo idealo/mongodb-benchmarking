@@ -40,7 +40,6 @@ func main() {
 	collection := client.Database("benchmarking").Collection("testdata")
 	mongoCollection := &MongoDBCollection{Collection: collection}
 
-	// if duration is given by the user we neeed to initialise a strategy for duration testing
 	if duration > 0 {
 		strategy = DurationTestingStrategy{}
 		config = TestingConfig{
@@ -53,18 +52,19 @@ func main() {
 		if runAll {
 			strategy.runTestSequence(mongoCollection, config)
 		} else {
-			strategy.runTest(mongoCollection, testType, config, fetchDocumentIDs)
+			strategy.runTest(mongoCollection, testType, config, fetchSampledDocIDs)
 		}
 	} else {
 		strategy = DocCountTestingStrategy{}
 		config = TestingConfig{
 			Threads:  threads,
 			DocCount: docCount,
+			DropDb:   dropDb,
 		}
 		if runAll {
 			strategy.runTestSequence(mongoCollection, config)
 		} else {
-			strategy.runTest(mongoCollection, testType, config, fetchDocumentIDs)
+			strategy.runTest(mongoCollection, testType, config, fetchSampledDocIDs)
 		}
 	}
 

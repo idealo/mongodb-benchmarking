@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,6 +15,8 @@ type CollectionAPI interface {
 	UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error)
 	DeleteOne(ctx context.Context, filter interface{}) (*mongo.DeleteResult, error)
 	CountDocuments(ctx context.Context, filter interface{}) (int64, error)
+	EstimatedDocumentCount(ctx context.Context) (int64, error)
+	Aggregate(ctx context.Context, pipeline interface{}, opts ...*options.AggregateOptions) (*mongo.Cursor, error)
 	Drop(ctx context.Context) error
 	Find(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (*mongo.Cursor, error)
 }
@@ -49,32 +50,126 @@ func (c *MongoDBCollection) Find(ctx context.Context, filter interface{}, opts .
 	return c.Collection.Find(ctx, filter, opts...)
 }
 
-func fetchDocumentIDs(collection CollectionAPI) ([]primitive.ObjectID, error) {
-	var docIDs []primitive.ObjectID
+func (c *MongoDBCollection) EstimatedDocumentCount(ctx context.Context) (int64, error) {
+	return c.Collection.EstimatedDocumentCount(ctx)
+}
 
-	cursor, err := collection.Find(context.Background(), bson.M{}, options.Find().SetProjection(bson.M{"_id": 1}))
+func (c *MongoDBCollection) Aggregate(ctx context.Context, pipeline interface{}, opts ...*options.AggregateOptions) (*mongo.Cursor, error) {
+	return c.Collection.Aggregate(ctx, pipeline, opts...)
+}
+
+func fetchSampledDocIDs(collection CollectionAPI, docIDChannel chan<- primitive.ObjectID, testType string) {
+	// Get the estimated document count
+	estimatedCount, err := collection.EstimatedDocumentCount(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch document IDs: %v", err)
+		log.Fatalf("Failed to get estimated document count: %v", err)
 	}
-	defer cursor.Close(context.Background())
 
-	for cursor.Next(context.Background()) {
-		var result bson.M
-		if err := cursor.Decode(&result); err != nil {
-			log.Printf("Failed to decode document: %v", err)
-			continue
+	log.Printf("Estimated document count: %d", estimatedCount)
+
+	if estimatedCount <= 1000 {
+		log.Println("Collection is small; fetching all IDs.")
+		cursor, err := collection.Find(context.Background(), bson.M{})
+		if err != nil {
+			log.Fatalf("Failed to fetch document IDs: %v", err)
 		}
-		// Check if `_id` is of type `ObjectId` and add to `docIDs`
-		if id, ok := result["_id"].(primitive.ObjectID); ok {
-			docIDs = append(docIDs, id)
-		} else {
-			log.Printf("Skipping document with unsupported _id type: %T", result["_id"])
+		defer cursor.Close(context.Background())
+
+		for cursor.Next(context.Background()) {
+			var result struct {
+				ID primitive.ObjectID `bson:"_id"`
+			}
+			if err := cursor.Decode(&result); err != nil {
+				log.Printf("Failed to decode document ID: %v", err)
+				continue
+			}
+			docIDChannel <- result.ID
+		}
+	} else if testType == "delete" {
+		log.Println("Collection is large; fetching document IDs in ordered batches for deletion.")
+
+		batchSize := 40000
+		totalFetched := 0
+		var lastID primitive.ObjectID
+
+		for totalFetched < int(estimatedCount) {
+			remaining := int(estimatedCount) - totalFetched
+			size := batchSize
+			if remaining < batchSize {
+				size = remaining
+			}
+
+			filter := bson.M{}
+			if !lastID.IsZero() {
+				filter["_id"] = bson.M{"$gt": lastID}
+			}
+
+			options := options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetLimit(int64(size))
+			cursor, err := collection.Find(context.Background(), filter, options)
+			if err != nil {
+				log.Fatalf("Failed to fetch ordered document IDs: %v", err)
+			}
+			defer cursor.Close(context.Background())
+
+			for cursor.Next(context.Background()) {
+				var result struct {
+					ID primitive.ObjectID `bson:"_id"`
+				}
+				if err := cursor.Decode(&result); err != nil {
+					log.Printf("Failed to decode document ID: %v", err)
+					continue
+				}
+				docIDChannel <- result.ID
+				lastID = result.ID
+				totalFetched++
+			}
+
+			if err := cursor.Err(); err != nil {
+				log.Printf("Cursor error: %v", err)
+			}
+
+			cursor.Close(context.Background())
+		}
+	} else {
+		log.Println("Collection is large; fetching document IDs in random batches.")
+
+		batchSize := 40000
+		totalFetched := 0
+
+		for totalFetched < int(estimatedCount) {
+			remaining := int(estimatedCount) - totalFetched
+			size := batchSize
+			if remaining < batchSize {
+				size = remaining
+			}
+
+			pipeline := []bson.M{{"$sample": bson.M{"size": size}}}
+			cursor, err := collection.Aggregate(context.Background(), pipeline)
+			if err != nil {
+				log.Fatalf("Failed to aggregate document IDs: %v", err)
+			}
+			defer cursor.Close(context.Background())
+
+			for cursor.Next(context.Background()) {
+				var result struct {
+					ID primitive.ObjectID `bson:"_id"`
+				}
+				if err := cursor.Decode(&result); err != nil {
+					log.Printf("Failed to decode document ID: %v", err)
+					continue
+				}
+				docIDChannel <- result.ID
+				totalFetched++
+			}
+
+			if err := cursor.Err(); err != nil {
+				log.Printf("Cursor error: %v", err)
+			}
+
+			cursor.Close(context.Background())
 		}
 	}
 
-	if err := cursor.Err(); err != nil {
-		return nil, fmt.Errorf("cursor error: %v", err)
-	}
-
-	return docIDs, nil
+	close(docIDChannel)
+	log.Println("Finished streaming document IDs.")
 }

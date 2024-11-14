@@ -17,7 +17,6 @@ func main() {
 	var runAll bool
 	var largeDocs bool
 	var dropDb bool
-	var limit int64
 
 	flag.IntVar(&threads, "threads", 10, "Number of threads for inserting, updating, upserting, or deleting documents")
 	flag.IntVar(&docCount, "docs", 1000, "Total number of documents to insert, update, upsert, or delete")
@@ -27,7 +26,6 @@ func main() {
 	flag.IntVar(&duration, "duration", 0, "Duration in seconds to run the test")
 	flag.BoolVar(&largeDocs, "largeDocs", false, "Use large documents for testing")
 	flag.BoolVar(&dropDb, "dropDb", true, "Drop the database before running the test")
-	flag.Int64("limit", 0, "Limit the number of documents to fetch")
 	flag.Parse()
 
 	var strategy TestingStrategy
@@ -50,7 +48,6 @@ func main() {
 			Duration:  duration,
 			LargeDocs: largeDocs,
 			DropDb:    dropDb,
-			Limit:     limit,
 		}
 
 		if runAll {

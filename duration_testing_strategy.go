@@ -45,7 +45,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 			log.Println("Collection stays. Dropping disabled.")
 		}
 	} else if testType == "update" {
-		docIDs, err := fetchDocIDs(collection, config.Limit, testType)
+		docIDs, err := fetchDocIDs(collection, int64(config.DocCount), testType)
 		if err != nil {
 			log.Fatalf("Failed to fetch document IDs: %v", err)
 		}

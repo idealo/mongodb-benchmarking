@@ -51,7 +51,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	switch testType {
 	case "delete":
 		// Fetch document IDs as ObjectId and partition them
-		docIDs, err := fetchDocIDs(collection, config.Limit, testType)
+		docIDs, err := fetchDocIDs(collection, int64(config.DocCount), testType)
 		if err != nil {
 			log.Fatalf("Failed to fetch document IDs: %v", err)
 		}
@@ -67,7 +67,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 		}
 
 	case "update":
-		docIDs, err := fetchDocIDs(collection, config.Limit, testType)
+		docIDs, err := fetchDocIDs(collection, int64(config.DocCount), testType)
 		if err != nil {
 			log.Fatalf("Failed to fetch document IDs: %v", err)
 		}

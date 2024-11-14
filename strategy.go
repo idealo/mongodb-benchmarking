@@ -8,7 +8,6 @@ type TestingConfig struct {
 	Duration  int
 	LargeDocs bool
 	DropDb    bool
-	Limit     int64
 }
 
 type TestingStrategy interface {

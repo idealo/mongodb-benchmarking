@@ -47,8 +47,13 @@ func (m *MockCollection) Find(ctx context.Context, filter interface{}, opts ...*
 	return args.Get(0).(*mongo.Cursor), args.Error(1)
 }
 
+func (m *MockCollection) Aggregate(ctx context.Context, pipeline interface{}, opts ...*options.AggregateOptions) (*mongo.Cursor, error) {
+	args := m.Called(ctx, pipeline, opts)
+	return args.Get(0).(*mongo.Cursor), args.Error(1)
+}
+
 // fetchDocumentIDsMock returns a slice of mock ObjectIDs for testing
-func fetchDocumentIDsMock(_ CollectionAPI) ([]primitive.ObjectID, error) {
+func fetchDocumentIDsMock(_ CollectionAPI, _ int64, _ string) ([]primitive.ObjectID, error) {
 	return []primitive.ObjectID{
 		primitive.NewObjectID(),
 		primitive.NewObjectID(),

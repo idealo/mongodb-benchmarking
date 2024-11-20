@@ -31,7 +31,7 @@ func main() {
 	var strategy TestingStrategy
 	var config TestingConfig
 
-	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri).SetMaxPoolSize(uint64(threads)))
 	if err != nil {
 		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
@@ -58,8 +58,10 @@ func main() {
 	} else {
 		strategy = DocCountTestingStrategy{}
 		config = TestingConfig{
-			Threads:  threads,
-			DocCount: docCount,
+			Threads:   threads,
+			DocCount:  docCount,
+			LargeDocs: largeDocs,
+			DropDb:    dropDb,
 		}
 		if runAll {
 			strategy.runTestSequence(mongoCollection, config)

@@ -35,7 +35,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
-	defer client.Disconnect(context.Background())
+	defer func(client *mongo.Client, ctx context.Context) {
+		err := client.Disconnect(ctx)
+		if err != nil {
+			log.Fatalf("Failed to disconnect from MongoDB: %v", err)
+		}
+	}(client, context.Background())
 
 	collection := client.Database("benchmarking").Collection("testdata")
 	mongoCollection := &MongoDBCollection{Collection: collection}

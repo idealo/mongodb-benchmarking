@@ -92,6 +92,9 @@ func fetchDocumentIDs(collection CollectionAPI, limit int64, testType string) ([
 		if limit > 0 {
 			pipeline := []bson.M{{"$sample": bson.M{"size": limit}}}
 			cursor, err = collection.Aggregate(context.Background(), pipeline)
+			if err != nil {
+				return nil, fmt.Errorf("failed to aggregate documents: %v", err)
+			}
 
 			defer cursor.Close(context.Background())
 

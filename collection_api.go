@@ -95,8 +95,9 @@ func fetchDocumentIDs(collection CollectionAPI, limit int64, testType string) ([
 			if err != nil {
 				return nil, fmt.Errorf("failed to aggregate documents: %v", err)
 			}
-
-			defer cursor.Close(context.Background())
+			if cursor != nil {
+				defer cursor.Close(context.Background()) // Only defer if cursor is valid
+			}
 
 			for cursor.Next(context.Background()) {
 				var result bson.M
@@ -113,7 +114,14 @@ func fetchDocumentIDs(collection CollectionAPI, limit int64, testType string) ([
 			}
 
 		} else {
-			defer cursor.Close(context.Background())
+
+			cursor, err = collection.Find(context.Background(), bson.M{}, options.Find().SetProjection(bson.M{"_id": 1}))
+			if err != nil {
+				return nil, fmt.Errorf("failed to aggregate documents: %v", err)
+			}
+			if cursor != nil {
+				defer cursor.Close(context.Background()) // Only defer if cursor is valid
+			}
 
 			for cursor.Next(context.Background()) {
 				var result bson.M

@@ -18,8 +18,8 @@ run: ## Runs the application with THREADS, DOCS, and URI variables
 
 .PHONY: clean
 clean: ## Remove generated binary
-	@echo "🔹 Deleting go binary exporter_proxy"
-	@rm -rf mongo-bench
+	@echo "🔹 Deleting go binary $(BINARY_NAME)"
+	@rm -rf $(BINARY_NAME)
 	@echo "✅  Environment cleaned!"
 
 .PHONY: test
@@ -53,6 +53,16 @@ update: ## Update dependencies and tidy the go.mod file
 	@echo "Updating dependencies" \
 		&& go get -u ./... \
 	    && go mod tidy
+
+.PHONY: run-compose
+run-compose: ## Running integration tests
+	@echo "🔹 Starting integration tests with mongo in docker-compose ..."
+	docker-compose up --build
+
+reset: clean ## Reset the development environment
+	@echo "🔹 resetting dev environment"
+	@docker-compose down
+	@echo "✅  Environment cleaned!"
 
 .PHONY: help
 help:

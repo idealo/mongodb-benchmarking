@@ -49,3 +49,6 @@ fi
 # Run the all test
 echo 'Running all test...'
 ./mongo-bench --uri mongodb://root:example@mongodb:27017 --runAll --threads 10 --docs 80000
+
+echo 'Running duration test...'
+./mongo-bench --duration 10  --threads 10 -type update --uri mongodb://root:example@mongodb:27017

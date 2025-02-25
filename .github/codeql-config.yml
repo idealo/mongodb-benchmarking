@@ -1,0 +1,11 @@
+name: "CodeQL Config for Golang"
+
+paths:
+  - "./"
+
+queries:
+  - uses: security-and-quality
+  - uses: go-security-extended
+  - uses: go-security-and-quality
+
+disable-default-queries: false

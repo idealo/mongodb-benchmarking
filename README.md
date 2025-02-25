@@ -1,6 +1,8 @@
 
 # MongoDB Benchmarking Tool - mongo-bench
 
+![CodeQL](https://github.com/idealo/mongodb-benchmarking/actions/workflows/codeql.yml/badge.svg)
+
 `mongo-bench` is a high-performance benchmarking tool written in Golang designed to test and measure 
 MongoDB insert, update, delete, and upsert rates under configurable conditions. 
 This tool is useful for database engineers, developers, and system administrators who want to assess MongoDB 

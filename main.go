@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"flag"
+	"log"
+
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"log"
 )
 
 func main() {
@@ -62,7 +63,7 @@ func main() {
 		}
 		strategy = DocCountTestingStrategy{}
 	}
-	if runAll {
+	if runAll || testType == "runAll" {
 		strategy.runTestSequence(mongoCollection, config)
 	} else {
 		strategy.runTest(mongoCollection, testType, config, fetchDocumentIDs)

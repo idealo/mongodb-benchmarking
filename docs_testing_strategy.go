@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"github.com/rcrowley/go-metrics"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"math/rand"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type DocCountTestingStrategy struct{}
@@ -73,6 +74,8 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 			docID := docIDs[rand.Intn(len(docIDs))]
 			partitions[i%threads] = append(partitions[i%threads], docID)
 		}
+	default:
+		log.Fatalf("Unknown or unsupported test type, exiting...")
 	}
 
 	// Start the ticker just before starting the main workload goroutines

@@ -195,7 +195,12 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	}
 	records = append(records, finalRecord)
 
-	filename := fmt.Sprintf("benchmark_results_%s.csv", testType)
+	filenamePrefix := "benchmark_results"
+	if config.OutputFilePrefix != "" {
+		filenamePrefix = config.OutputFilePrefix
+	}
+
+	filename := fmt.Sprintf("%s_%s.csv", filenamePrefix, testType)
 	file, err := os.Create(filename)
 	if err != nil {
 		log.Fatalf("Failed to create CSV file: %v", err)

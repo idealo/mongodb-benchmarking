@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
 	"math/rand"
 	"os"
 	"sync"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/rcrowley/go-metrics"
 	"go.mongodb.org/mongo-driver/bson"
@@ -167,7 +168,12 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 	records = append(records, finalRecord)
 
 	// Write metrics to CSV file
-	filename := fmt.Sprintf("benchmark_results_%s.csv", testType)
+	filenamePrefix := "benchmark_results"
+	if config.OutputFilePrefix != "" {
+		filenamePrefix = config.OutputFilePrefix
+	}
+
+	filename := fmt.Sprintf("%s_%s.csv", filenamePrefix, testType)
 	file, err := os.Create(filename)
 	if err != nil {
 		log.Fatalf("Failed to create CSV file: %v", err)

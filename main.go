@@ -14,6 +14,7 @@ func main() {
 	var docCount int
 	var uri string
 	var testType string
+	var outputFilePrefix string
 	var duration int
 	var runAll bool
 	var largeDocs bool
@@ -27,6 +28,8 @@ func main() {
 	flag.IntVar(&duration, "duration", 0, "Duration in seconds to run the test")
 	flag.BoolVar(&largeDocs, "largeDocs", false, "Use large documents for testing")
 	flag.BoolVar(&dropDb, "dropDb", true, "Drop the database before running the test")
+	flag.StringVar(&outputFilePrefix, "out", "", "Output filename prefix (default: empty, using 'benchmark_results_*'")
+
 	flag.Parse()
 
 	var strategy TestingStrategy
@@ -48,18 +51,20 @@ func main() {
 
 	if duration > 0 {
 		config = TestingConfig{
-			Threads:   threads,
-			Duration:  duration,
-			LargeDocs: largeDocs,
-			DropDb:    dropDb,
+			Threads:          threads,
+			Duration:         duration,
+			LargeDocs:        largeDocs,
+			DropDb:           dropDb,
+			OutputFilePrefix: outputFilePrefix,
 		}
 		strategy = DurationTestingStrategy{}
 	} else {
 		config = TestingConfig{
-			Threads:   threads,
-			DocCount:  docCount,
-			LargeDocs: largeDocs,
-			DropDb:    dropDb,
+			Threads:          threads,
+			DocCount:         docCount,
+			LargeDocs:        largeDocs,
+			DropDb:           dropDb,
+			OutputFilePrefix: outputFilePrefix,
 		}
 		strategy = DocCountTestingStrategy{}
 	}

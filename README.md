@@ -41,13 +41,17 @@ After building the tool, run it with customizable parameters:
 - `-largeDocs`: Use large documents (2K) (default: false).
 - `-dropDb`: Drop the database before running the test (default: true).
 - `-uri`: MongoDB connection URI.
-- `-type`: Type of test to run. Accepts `insert`, `update`, `delete`, `upsert`, or `runAll`:
+- `-createIndex`: Create indexes (just in `insertdoc` mode)
+- `-out`: Output file prefix. (Default: empty, using "benchmark_results_*")
+
+- `-type`: Type of test to run. Accepts `insert`, `insertdoc`, `update`, `delete`, `upsert`, or `runAll`:
   - `insert`: The tool will insert new documents.
+  - `insertdoc`: The tool will insert new more complex documents to simulate real-life data.
   - `update`: The tool will update existing documents (requires that documents have been inserted in a prior run).
   - `delete`: The tool will delete existing documents. (just if `docs` is given)
   - `upsert`: The tool will perform upserts, repeatedly updating a specified range. (just if `docs` is given)
-  - `runAll`: Runs the `insert`, `update`, `delete`, and `upsert` tests sequentially. (just if `docs` is given)
-  - `runAll`: Runs the `insert`, `update` tests sequentially. (just if `duration` is given)
+  - `runAll`: Runs the `insert`, `update`, `delete`, `upsert` and `insertdoc` tests sequentially. (just if `docs` is given)
+  - `runAll`: Runs the `insert`, `insertdoc`, `update` tests sequentially. (just if `duration` is given)
 
 ### Example Commands
 

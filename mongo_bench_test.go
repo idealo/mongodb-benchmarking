@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
+	"testing"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -85,6 +86,25 @@ func TestInsertOperation(t *testing.T) {
 	strategy.runTest(mockCollection, testType, config, fetchDocumentIDsMock)
 
 	mockCollection.AssertNumberOfCalls(t, "Drop", 1)
+	mockCollection.AssertNumberOfCalls(t, "InsertOne", config.DocCount)
+}
+
+// TestInsertDocOperation tests the insertdoc operation using DocCountTestingStrategy
+func TestInsertDocOperation(t *testing.T) {
+	mockCollection := new(MockCollection)
+	config := TestingConfig{
+		Threads:  2,
+		DocCount: 10,
+		DropDb:   false, // bei insertdoc wird die Collection nicht gedroppt
+	}
+	strategy := DocCountTestingStrategy{}
+	testType := "insertdoc"
+
+	// Erwartung: InsertOne wird für jedes Dokument aufgerufen
+	mockCollection.On("InsertOne", mock.Anything, mock.Anything).Return(&mongo.InsertOneResult{}, nil)
+
+	strategy.runTest(mockCollection, testType, config, fetchDocumentIDsMock)
+
 	mockCollection.AssertNumberOfCalls(t, "InsertOne", config.DocCount)
 }
 

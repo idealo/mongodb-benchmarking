@@ -9,6 +9,7 @@ type TestingConfig struct {
 	LargeDocs        bool
 	DropDb           bool
 	OutputFilePrefix string
+	CreateIndex      bool
 }
 
 type TestingStrategy interface {

@@ -13,20 +13,21 @@ import (
 	"github.com/rcrowley/go-metrics"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type DocCountTestingStrategy struct{}
 
 func (t DocCountTestingStrategy) runTestSequence(collection CollectionAPI, config TestingConfig) {
-	tests := []string{"insert", "update", "delete", "upsert"}
+	tests := []string{"insert", "update", "delete", "upsert", "insertdoc"}
 	for _, test := range tests {
 		t.runTest(collection, test, config, fetchDocumentIDs)
 	}
 }
 
 func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI, int64, string) ([]primitive.ObjectID, error)) {
-	if testType == "insert" || testType == "upsert" {
+	if testType == "insert" || testType == "upsert" || testType == "insertdoc" {
 		if config.DropDb {
 			if err := collection.Drop(context.Background()); err != nil {
 				log.Fatalf("Failed to drop collection: %v", err)
@@ -37,6 +38,33 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 		}
 	} else {
 		log.Printf("Starting %s test...\n", testType)
+	}
+
+	// Create indexes before insertdoc test begins
+	if testType == "insertdoc" && config.CreateIndex == true {
+		log.Println("Creating indexes for insertdoc benchmark...")
+
+		indexes := []mongo.IndexModel{
+			{Keys: bson.D{{Key: "author", Value: 1}}},
+			{Keys: bson.D{{Key: "tags", Value: 1}}},
+			{Keys: bson.D{{Key: "timestamp", Value: -1}}},
+			{Keys: bson.D{{Key: "content", Value: "text"}}},
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		mongoColl, ok := collection.(*MongoDBCollection)
+		if !ok {
+			log.Println("Index creation skipped: Collection is not a MongoDBCollection")
+		} else {
+			_, err := mongoColl.Indexes().CreateMany(ctx, indexes)
+			if err != nil {
+				log.Printf("Failed to create indexes: %v", err)
+			} else {
+				log.Println("Indexes created successfully.")
+			}
+		}
 	}
 
 	var partitions [][]primitive.ObjectID
@@ -57,7 +85,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 			partitions[i%threads] = append(partitions[i%threads], id)
 		}
 
-	case "insert", "upsert":
+	case "insert", "upsert", "insertdoc":
 		partitions = make([][]primitive.ObjectID, threads)
 		for i := 0; i < docCount; i++ {
 			partitions[i%threads] = append(partitions[i%threads], primitive.NewObjectID())
@@ -84,10 +112,11 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	records = append(records, []string{"t", "count", "mean", "m1_rate", "m5_rate", "m15_rate", "mean_rate"})
 
 	var doc interface{}
-	var data = make([]byte, 1024*2)
+	generator := NewDocumentGenerator()
+	/*var data = make([]byte, 1024*2)
 	for i := 0; i < len(data); i++ {
 		data[i] = byte(rand.Intn(256))
-	}
+	}*/
 
 	secondTicker := time.NewTicker(1 * time.Second)
 	defer secondTicker.Stop()
@@ -126,15 +155,25 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 				switch testType {
 				case "insert":
 					if config.LargeDocs {
-						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1, "data": data}
+						//doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1, "data": data}
+						doc = generator.GenerateLarge(i)
 					} else {
-						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
+						//doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
+						doc = generator.GenerateSimple(i)
 					}
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
 						insertRate.Mark(1)
 					} else {
 						log.Printf("Insert failed: %v", err)
+					}
+				case "insertdoc":
+					doc = generator.GenerateComplex(i)
+					_, err := collection.InsertOne(context.Background(), doc)
+					if err == nil {
+						insertRate.Mark(1)
+					} else {
+						log.Printf("Insertdoc failed: %v", err)
 					}
 				case "update":
 					randomDocID := partition[rand.Intn(len(partition))]

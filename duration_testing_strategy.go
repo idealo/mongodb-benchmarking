@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/rcrowley/go-metrics"
 	"go.mongodb.org/mongo-driver/bson"
@@ -19,7 +20,7 @@ import (
 type DurationTestingStrategy struct{}
 
 func (t DurationTestingStrategy) runTestSequence(collection CollectionAPI, config TestingConfig) {
-	tests := []string{"insert", "update"}
+	tests := []string{"insert", "insertdoc", "update"}
 	for _, test := range tests {
 		t.runTest(collection, test, config, fetchDocumentIDs)
 	}
@@ -27,7 +28,7 @@ func (t DurationTestingStrategy) runTestSequence(collection CollectionAPI, confi
 
 func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI, int64, string) ([]primitive.ObjectID, error)) {
 	var partitions [][]primitive.ObjectID
-	if testType == "insert" {
+	if testType == "insert" || testType == "insertdoc" {
 		if config.DropDb {
 			if err := collection.Drop(context.Background()); err != nil {
 				log.Fatalf("Failed to clear collection before test: %v", err)
@@ -36,6 +37,35 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 		} else {
 			log.Println("Collection stays. Dropping disabled.")
 		}
+
+		// todo: prevent code duplicates
+		// Create indexes before insertdoc test begins
+		if testType == "insertdoc" && config.CreateIndex == true {
+			log.Println("Creating indexes for insertdoc benchmark...")
+
+			indexes := []mongo.IndexModel{
+				{Keys: bson.D{{Key: "author", Value: 1}}},
+				{Keys: bson.D{{Key: "tags", Value: 1}}},
+				{Keys: bson.D{{Key: "timestamp", Value: -1}}},
+				{Keys: bson.D{{Key: "content", Value: "text"}}},
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			mongoColl, ok := collection.(*MongoDBCollection)
+			if !ok {
+				log.Println("Index creation skipped: Collection is not a MongoDBCollection")
+			} else {
+				_, err := mongoColl.Indexes().CreateMany(ctx, indexes)
+				if err != nil {
+					log.Printf("Failed to create indexes: %v", err)
+				} else {
+					log.Println("Indexes created successfully.")
+				}
+			}
+		}
+
 	} else if testType == "update" {
 		docIDs, err := fetchDocIDs(collection, int64(config.DocCount), testType)
 		if err != nil {
@@ -54,10 +84,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 	}
 
 	var doc interface{}
-	var data = make([]byte, 1024*2)
-	for i := 0; i < len(data); i++ {
-		data[i] = byte(rand.Intn(256))
-	}
+	generator := NewDocumentGenerator()
 
 	endTime := time.Now().Add(time.Duration(config.Duration) * time.Second)
 	insertRate := metrics.NewMeter()
@@ -100,16 +127,33 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 				for time.Now().Before(endTime) {
 					if config.LargeDocs {
-						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1, "data": data}
-
+						//doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1, "data": data}
+						doc = generator.GenerateLarge(i)
 					} else {
-						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
+						//doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
+						doc = generator.GenerateSimple(i)
 					}
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
 						insertRate.Mark(1)
 					} else {
 						log.Printf("Insert failed: %v", err)
+					}
+				}
+			}()
+		}
+	} else if testType == "insertdoc" {
+		for i := 0; i < config.Threads; i++ {
+			go func() {
+				defer wg.Done()
+
+				for time.Now().Before(endTime) {
+					doc = generator.GenerateComplex(i)
+					_, err := collection.InsertOne(context.Background(), doc)
+					if err == nil {
+						insertRate.Mark(1)
+					} else {
+						log.Printf("Insertdoc failed: %v", err)
 					}
 				}
 			}()

@@ -24,7 +24,7 @@ func main() {
 	flag.IntVar(&threads, "threads", 10, "Number of threads for inserting, updating, upserting, or deleting documents")
 	flag.IntVar(&docCount, "docs", 1000, "Total number of documents to insert, insertdoc, update, upsert, or delete")
 	flag.StringVar(&uri, "uri", "mongodb://localhost:27017", "MongoDB URI")
-	flag.StringVar(&testType, "type", "insert", "Test type: insert, update, upsert, or delete")
+	flag.StringVar(&testType, "type", "insert", "Test type: insert, update, upsert, delete, insertdoc or finddoc")
 	flag.BoolVar(&runAll, "runAll", false, "Run all tests in order: insert, update, delete, upsert")
 	flag.IntVar(&duration, "duration", 0, "Duration in seconds to run the test")
 	flag.BoolVar(&largeDocs, "largeDocs", false, "Use large documents for testing")
@@ -55,6 +55,7 @@ func main() {
 		config = TestingConfig{
 			Threads:          threads,
 			Duration:         duration,
+			DocCount:         docCount,
 			LargeDocs:        largeDocs,
 			DropDb:           dropDb,
 			OutputFilePrefix: outputFilePrefix,
@@ -74,6 +75,8 @@ func main() {
 	}
 	if runAll || testType == "runAll" {
 		strategy.runTestSequence(mongoCollection, config)
+	} else if testType == "runDoc" {
+		strategy.runTestSequenceDoc(mongoCollection, config)
 	} else {
 		strategy.runTest(mongoCollection, testType, config, fetchDocumentIDs)
 	}

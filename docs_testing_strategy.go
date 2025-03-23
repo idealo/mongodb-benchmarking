@@ -20,7 +20,14 @@ import (
 type DocCountTestingStrategy struct{}
 
 func (t DocCountTestingStrategy) runTestSequence(collection CollectionAPI, config TestingConfig) {
-	tests := []string{"insert", "update", "delete", "upsert", "insertdoc"}
+	tests := []string{"insert", "update", "delete", "upsert"}
+	for _, test := range tests {
+		t.runTest(collection, test, config, fetchDocumentIDs)
+	}
+}
+
+func (t DocCountTestingStrategy) runTestSequenceDoc(collection CollectionAPI, config TestingConfig) {
+	tests := []string{"insertdoc", "finddoc"}
 	for _, test := range tests {
 		t.runTest(collection, test, config, fetchDocumentIDs)
 	}
@@ -102,6 +109,12 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 			docID := docIDs[rand.Intn(len(docIDs))]
 			partitions[i%threads] = append(partitions[i%threads], docID)
 		}
+	case "finddoc":
+		partitions = make([][]primitive.ObjectID, threads)
+		for i := 0; i < docCount; i++ {
+			partitions[i%threads] = append(partitions[i%threads], primitive.NewObjectID())
+		}
+
 	default:
 		log.Fatalf("Unknown or unsupported test type, exiting...")
 	}
@@ -113,6 +126,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 	var doc interface{}
 	generator := NewDocumentGenerator()
+	queryGenerator := NewQueryGenerator()
 	/*var data = make([]byte, 1024*2)
 	for i := 0; i < len(data); i++ {
 		data[i] = byte(rand.Intn(256))
@@ -209,6 +223,47 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 					if result.DeletedCount > 0 {
 						insertRate.Mark(1)
 					}
+				case "finddoc":
+
+					filter := queryGenerator.Generate()
+
+					opts := options.Find().
+						SetLimit(10).
+						SetProjection(bson.M{
+							"_id":       1,
+							"author":    1,
+							"title":     1,
+							"timestamp": 1,
+						})
+
+					// Perform the find operation without projection (full documents)
+					cursor, err := collection.Find(context.Background(), filter, opts)
+					if err != nil {
+						log.Printf("Find failed: %v", err)
+						continue
+					}
+
+					count := 0
+					for cursor.Next(context.Background()) {
+						var doc bson.M
+						if err := cursor.Decode(&doc); err != nil {
+							log.Printf("Failed to decode document: %v", err)
+							continue
+						}
+
+						// Optional: access fields from the document here
+						count++
+					}
+
+					if err := cursor.Err(); err != nil {
+						log.Printf("Cursor error: %v", err)
+					}
+					cursor.Close(context.Background())
+
+					// Mark the rate meter with the number of retrieved documents
+					//insertRate.Mark(int64(count)) // number of documents
+					insertRate.Mark(1) // number of requests
+
 				}
 			}
 		}(partitions[i])

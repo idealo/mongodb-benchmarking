@@ -12,6 +12,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/rcrowley/go-metrics"
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,7 +21,14 @@ import (
 type DurationTestingStrategy struct{}
 
 func (t DurationTestingStrategy) runTestSequence(collection CollectionAPI, config TestingConfig) {
-	tests := []string{"insert", "insertdoc", "update"}
+	tests := []string{"insert", "update"}
+	for _, test := range tests {
+		t.runTest(collection, test, config, fetchDocumentIDs)
+	}
+}
+
+func (t DurationTestingStrategy) runTestSequenceDoc(collection CollectionAPI, config TestingConfig) {
+	tests := []string{"insertdoc", "finddoc"}
 	for _, test := range tests {
 		t.runTest(collection, test, config, fetchDocumentIDs)
 	}
@@ -68,6 +76,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 	} else if testType == "update" {
 		docIDs, err := fetchDocIDs(collection, int64(config.DocCount), testType)
+		// also possible: fetchDocIDs(collection, 0, testType) because config.DocCount was not set before, so it was always 0
 		if err != nil {
 			log.Fatalf("Failed to fetch document IDs: %v", err)
 		}
@@ -80,6 +89,12 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 		partitions = make([][]primitive.ObjectID, config.Threads)
 		for i, id := range docIDs {
 			partitions[i%config.Threads] = append(partitions[i%config.Threads], id)
+		}
+	} else if testType == "finddoc" {
+
+		partitions = make([][]primitive.ObjectID, config.Threads)
+		for i := 0; i < config.DocCount; i++ {
+			partitions[i%config.Threads] = append(partitions[i%config.Threads], primitive.NewObjectID())
 		}
 	}
 
@@ -118,6 +133,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 	// Launch the workload in goroutines
 	var wg sync.WaitGroup
 	wg.Add(config.Threads)
+	queryGenerator := NewQueryGenerator()
 
 	if testType == "insert" {
 		// Insert operations using generated IDs
@@ -158,7 +174,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 				}
 			}()
 		}
-	} else {
+	} else { // update and finddoc operations
 		for i := 0; i < config.Threads; i++ {
 			// Check if the partition is non-empty for this thread
 			if len(partitions) <= i || len(partitions[i]) == 0 {
@@ -184,6 +200,45 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 						} else {
 							log.Printf("Update failed for _id %v: %v", docID, err)
 						}
+					case "finddoc":
+
+						filter := queryGenerator.Generate()
+
+						opts := options.Find().
+							SetLimit(10).
+							SetProjection(bson.M{
+								"_id":       1,
+								"author":    1,
+								"title":     1,
+								"timestamp": 1,
+							})
+
+						// Perform the find operation without projection (full documents)
+						cursor, err := collection.Find(context.Background(), filter, opts)
+						if err != nil {
+							log.Printf("Find failed: %v", err)
+							continue
+						}
+
+						count := 0
+						for cursor.Next(context.Background()) {
+							var doc bson.M
+							if err := cursor.Decode(&doc); err != nil {
+								log.Printf("Failed to decode document: %v", err)
+								continue
+							}
+
+							// Optional: access fields from the document here
+							count++
+						}
+
+						if err := cursor.Err(); err != nil {
+							log.Printf("Cursor error: %v", err)
+
+						}
+						cursor.Close(context.Background())
+						insertRate.Mark(1)
+
 					}
 				}
 			}(partition)

@@ -37,24 +37,31 @@ func NewDocumentGenerator() *DocumentGenerator {
 }
 
 func (g *DocumentGenerator) GenerateSimple(threadRunCount int) bson.M {
-	return bson.M{"threadRunCount": threadRunCount, "rnd": rand.Int63(), "v": 1}
+	return bson.M{"threadRunCount": threadRunCount,
+		"rnd": g.rnd.Int63(),
+		"v":   1,
+	}
 }
 
 func (g *DocumentGenerator) GenerateLarge(threadRunCount int) bson.M {
 	for i := range g.data {
-		g.data[i] = byte(rand.Intn(256))
+		g.data[i] = byte(g.rnd.Intn(256))
 	}
-	return bson.M{"threadRunCount": threadRunCount, "rnd": rand.Int63(), "v": 1, "data": g.data}
+	return bson.M{"threadRunCount": threadRunCount,
+		"rnd":  g.rnd.Int63(),
+		"v":    1,
+		"data": g.data,
+	}
 }
 
 func (g *DocumentGenerator) GenerateComplex(threadRunCount int) bson.M {
-	numTags := rand.Intn(3) + 4      // 4–6 tags
-	numCoAuthors := rand.Intn(3) + 1 // 1–3 co-authors
+	numTags := g.rnd.Intn(3) + 4      // 4–6 tags
+	numCoAuthors := g.rnd.Intn(3) + 1 // 1–3 co-authors
 
 	tags := g.randomSample(g.tags, numTags)
 	coAuthors := g.randomSample(g.authors, numCoAuthors)
-	category := g.category[rand.Intn(len(g.category))]
-	author := g.authors[rand.Intn(len(g.authors))]
+	category := g.category[g.rnd.Intn(len(g.category))]
+	author := g.authors[g.rnd.Intn(len(g.authors))]
 
 	return bson.M{
 		"_id":            primitive.NewObjectID(),
@@ -65,21 +72,25 @@ func (g *DocumentGenerator) GenerateComplex(threadRunCount int) bson.M {
 		"author":         author,
 		"co_authors":     coAuthors,
 		"summary":        g.generateLoremIpsum(100),
-		"content":        g.generateLoremIpsum(2000 + rand.Intn(3000)),
+		"content":        g.generateLoremIpsum(2000 + g.rnd.Intn(3000)),
 		"tags":           tags,
 		"category":       category,
-		"timestamp":      time.Now().Add(-time.Duration(rand.Intn(365*2)) * 24 * time.Hour),
-		"views":          rand.Intn(10000),
-		"comments":       rand.Intn(500),
-		"likes":          rand.Intn(1000),
-		"shares":         rand.Intn(200),
+		"timestamp":      time.Now().Add(-time.Duration(g.rnd.Intn(365*2)) * 24 * time.Hour),
+		"views":          g.rnd.Intn(10000),
+		"comments":       g.rnd.Intn(500),
+		"likes":          g.rnd.Intn(1000),
+		"shares":         g.rnd.Intn(200),
 	}
 }
 
 func (g *DocumentGenerator) generateLoremIpsum(minLen int) string {
 	text := ""
 	for len(text) < minLen {
-		text += g.lorem[g.rnd.Intn(len(g.lorem))] + " "
+		if g.rnd.Float32() < 0.1 { // 10% chance to insert a tag
+			text += g.tags[g.rnd.Intn(len(g.tags))] + " "
+		} else {
+			text += g.lorem[g.rnd.Intn(len(g.lorem))] + " "
+		}
 	}
 	return text[:minLen]
 }

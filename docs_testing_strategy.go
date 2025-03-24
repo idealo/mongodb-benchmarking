@@ -125,7 +125,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	records = append(records, []string{"t", "count", "mean", "m1_rate", "m5_rate", "m15_rate", "mean_rate"})
 
 	var doc interface{}
-	generator := NewDocumentGenerator()
+
 	queryGenerator := NewQueryGenerator()
 	/*var data = make([]byte, 1024*2)
 	for i := 0; i < len(data); i++ {
@@ -164,16 +164,17 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 	for i := 0; i < threads; i++ {
 		go func(partition []primitive.ObjectID) {
+			docGen := NewDocumentGenerator()
 			defer wg.Done()
 			for _, docID := range partition {
 				switch testType {
 				case "insert":
 					if config.LargeDocs {
 						//doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1, "data": data}
-						doc = generator.GenerateLarge(i)
+						doc = docGen.GenerateLarge(i)
 					} else {
 						//doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
-						doc = generator.GenerateSimple(i)
+						doc = docGen.GenerateSimple(i)
 					}
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
@@ -182,7 +183,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 						log.Printf("Insert failed: %v", err)
 					}
 				case "insertdoc":
-					doc = generator.GenerateComplex(i)
+					doc = docGen.GenerateComplex(i)
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
 						insertRate.Mark(1)

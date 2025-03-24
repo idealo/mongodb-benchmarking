@@ -99,7 +99,6 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 	}
 
 	var doc interface{}
-	generator := NewDocumentGenerator()
 
 	endTime := time.Now().Add(time.Duration(config.Duration) * time.Second)
 	insertRate := metrics.NewMeter()
@@ -140,14 +139,15 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 		for i := 0; i < config.Threads; i++ {
 			go func() {
 				defer wg.Done()
+				docGen := NewDocumentGenerator()
 
 				for time.Now().Before(endTime) {
 					if config.LargeDocs {
 						//doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1, "data": data}
-						doc = generator.GenerateLarge(i)
+						doc = docGen.GenerateLarge(i)
 					} else {
 						//doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
-						doc = generator.GenerateSimple(i)
+						doc = docGen.GenerateSimple(i)
 					}
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
@@ -162,9 +162,10 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 		for i := 0; i < config.Threads; i++ {
 			go func() {
 				defer wg.Done()
+				docGen := NewDocumentGenerator()
 
 				for time.Now().Before(endTime) {
-					doc = generator.GenerateComplex(i)
+					doc = docGen.GenerateComplex(i)
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
 						insertRate.Mark(1)

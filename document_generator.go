@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type DocumentGenerator struct {
@@ -64,7 +63,6 @@ func (g *DocumentGenerator) GenerateComplex(threadRunCount int) bson.M {
 	author := g.authors[g.rnd.Intn(len(g.authors))]
 
 	return bson.M{
-		"_id":            primitive.NewObjectID(),
 		"threadRunCount": threadRunCount,
 		"rnd":            g.rnd.Int63(),
 		"v":              1,

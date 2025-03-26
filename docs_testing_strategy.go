@@ -126,7 +126,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 	var doc interface{}
 
-	queryGenerator := NewQueryGenerator()
+	queryGenerator := NewQueryGenerator(config.QueryType)
 	/*var data = make([]byte, 1024*2)
 	for i := 0; i < len(data); i++ {
 		data[i] = byte(rand.Intn(256))
@@ -235,9 +235,9 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 							"author":    1,
 							"title":     1,
 							"timestamp": 1,
-						})
+						}).
+						SetSort(bson.D{{Key: "timestamp", Value: -1}})
 
-					// Perform the find operation without projection (full documents)
 					cursor, err := collection.Find(context.Background(), filter, opts)
 					if err != nil {
 						log.Printf("Find failed: %v", err)

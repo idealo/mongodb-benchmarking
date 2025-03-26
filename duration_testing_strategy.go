@@ -132,7 +132,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 	// Launch the workload in goroutines
 	var wg sync.WaitGroup
 	wg.Add(config.Threads)
-	queryGenerator := NewQueryGenerator()
+	queryGenerator := NewQueryGenerator(config.QueryType)
 
 	if testType == "insert" {
 		// Insert operations using generated IDs
@@ -212,9 +212,9 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 								"author":    1,
 								"title":     1,
 								"timestamp": 1,
-							})
+							}).
+							SetSort(bson.D{{Key: "timestamp", Value: -1}})
 
-						// Perform the find operation without projection (full documents)
 						cursor, err := collection.Find(context.Background(), filter, opts)
 						if err != nil {
 							log.Printf("Find failed: %v", err)

@@ -4,15 +4,17 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"github.com/rcrowley/go-metrics"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"math/rand"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type DocCountTestingStrategy struct{}
@@ -24,8 +26,15 @@ func (t DocCountTestingStrategy) runTestSequence(collection CollectionAPI, confi
 	}
 }
 
+func (t DocCountTestingStrategy) runTestSequenceDoc(collection CollectionAPI, config TestingConfig) {
+	tests := []string{"insertdoc", "finddoc"}
+	for _, test := range tests {
+		t.runTest(collection, test, config, fetchDocumentIDs)
+	}
+}
+
 func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI, int64, string) ([]primitive.ObjectID, error)) {
-	if testType == "insert" || testType == "upsert" {
+	if testType == "insert" || testType == "upsert" || testType == "insertdoc" {
 		if config.DropDb {
 			if err := collection.Drop(context.Background()); err != nil {
 				log.Fatalf("Failed to drop collection: %v", err)
@@ -36,6 +45,33 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 		}
 	} else {
 		log.Printf("Starting %s test...\n", testType)
+	}
+
+	// Create indexes before insertdoc test begins
+	if testType == "insertdoc" && config.CreateIndex == true {
+		log.Println("Creating indexes for insertdoc benchmark...")
+
+		indexes := []mongo.IndexModel{
+			{Keys: bson.D{{Key: "author", Value: 1}}},
+			{Keys: bson.D{{Key: "tags", Value: 1}}},
+			{Keys: bson.D{{Key: "timestamp", Value: -1}}},
+			{Keys: bson.D{{Key: "content", Value: "text"}}},
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		mongoColl, ok := collection.(*MongoDBCollection)
+		if !ok {
+			log.Println("Index creation skipped: Collection is not a MongoDBCollection")
+		} else {
+			_, err := mongoColl.Indexes().CreateMany(ctx, indexes)
+			if err != nil {
+				log.Printf("Failed to create indexes: %v", err)
+			} else {
+				log.Println("Indexes created successfully.")
+			}
+		}
 	}
 
 	var partitions [][]primitive.ObjectID
@@ -56,7 +92,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 			partitions[i%threads] = append(partitions[i%threads], id)
 		}
 
-	case "insert", "upsert":
+	case "insert", "upsert", "insertdoc":
 		partitions = make([][]primitive.ObjectID, threads)
 		for i := 0; i < docCount; i++ {
 			partitions[i%threads] = append(partitions[i%threads], primitive.NewObjectID())
@@ -73,6 +109,14 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 			docID := docIDs[rand.Intn(len(docIDs))]
 			partitions[i%threads] = append(partitions[i%threads], docID)
 		}
+	case "finddoc":
+		partitions = make([][]primitive.ObjectID, threads)
+		for i := 0; i < docCount; i++ {
+			partitions[i%threads] = append(partitions[i%threads], primitive.NewObjectID())
+		}
+
+	default:
+		log.Fatalf("Unknown or unsupported test type, exiting...")
 	}
 
 	// Start the ticker just before starting the main workload goroutines
@@ -81,10 +125,12 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	records = append(records, []string{"t", "count", "mean", "m1_rate", "m5_rate", "m15_rate", "mean_rate"})
 
 	var doc interface{}
-	var data = make([]byte, 1024*2)
+
+	queryGenerator := NewQueryGenerator(config.QueryType)
+	/*var data = make([]byte, 1024*2)
 	for i := 0; i < len(data); i++ {
 		data[i] = byte(rand.Intn(256))
-	}
+	}*/
 
 	secondTicker := time.NewTicker(1 * time.Second)
 	defer secondTicker.Stop()
@@ -118,20 +164,31 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 	for i := 0; i < threads; i++ {
 		go func(partition []primitive.ObjectID) {
+			docGen := NewDocumentGenerator()
 			defer wg.Done()
 			for _, docID := range partition {
 				switch testType {
 				case "insert":
 					if config.LargeDocs {
-						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1, "data": data}
+						//doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1, "data": data}
+						doc = docGen.GenerateLarge(i)
 					} else {
-						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
+						//doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
+						doc = docGen.GenerateSimple(i)
 					}
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
 						insertRate.Mark(1)
 					} else {
 						log.Printf("Insert failed: %v", err)
+					}
+				case "insertdoc":
+					doc = docGen.GenerateComplex(i)
+					_, err := collection.InsertOne(context.Background(), doc)
+					if err == nil {
+						insertRate.Mark(1)
+					} else {
+						log.Printf("Insertdoc failed: %v", err)
 					}
 				case "update":
 					randomDocID := partition[rand.Intn(len(partition))]
@@ -167,6 +224,48 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 					if result.DeletedCount > 0 {
 						insertRate.Mark(1)
 					}
+				case "finddoc":
+
+					filter := queryGenerator.Generate()
+
+					opts := options.Find().
+						SetLimit(10).
+						SetProjection(bson.M{
+							"_id":       1,
+							"author":    1,
+							"title":     1,
+							"timestamp": 1,
+						})
+						//.
+						//	SetSort(bson.D{{Key: "timestamp", Value: -1}})
+
+					cursor, err := collection.Find(context.Background(), filter, opts)
+					if err != nil {
+						log.Printf("Find failed: %v", err)
+						continue
+					}
+
+					count := 0
+					for cursor.Next(context.Background()) {
+						var doc bson.M
+						if err := cursor.Decode(&doc); err != nil {
+							log.Printf("Failed to decode document: %v", err)
+							continue
+						}
+
+						// Optional: access fields from the document here
+						count++
+					}
+
+					if err := cursor.Err(); err != nil {
+						log.Printf("Cursor error: %v", err)
+					}
+					cursor.Close(context.Background())
+
+					// Mark the rate meter with the number of retrieved documents
+					//insertRate.Mark(int64(count)) // number of documents
+					insertRate.Mark(1) // number of requests
+
 				}
 			}
 		}(partitions[i])
@@ -192,7 +291,12 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	}
 	records = append(records, finalRecord)
 
-	filename := fmt.Sprintf("benchmark_results_%s.csv", testType)
+	filenamePrefix := "benchmark_results"
+	if config.OutputFilePrefix != "" {
+		filenamePrefix = config.OutputFilePrefix
+	}
+
+	filename := fmt.Sprintf("%s_%s.csv", filenamePrefix, testType)
 	file, err := os.Create(filename)
 	if err != nil {
 		log.Fatalf("Failed to create CSV file: %v", err)

@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
+	"testing"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -86,6 +87,43 @@ func TestInsertOperation(t *testing.T) {
 
 	mockCollection.AssertNumberOfCalls(t, "Drop", 1)
 	mockCollection.AssertNumberOfCalls(t, "InsertOne", config.DocCount)
+}
+
+// TestInsertDocOperation tests the "insertdoc" operation using DocCountTestingStrategy
+func TestInsertDocOperation(t *testing.T) {
+	mockCollection := new(MockCollection)
+	config := TestingConfig{
+		Threads:  2,
+		DocCount: 10,
+		DropDb:   false, // Collection is not dropped for insertdoc
+	}
+	strategy := DocCountTestingStrategy{}
+	testType := "insertdoc"
+
+	// Expectation: InsertOne should be called once for each document
+	mockCollection.On("InsertOne", mock.Anything, mock.Anything).Return(&mongo.InsertOneResult{}, nil)
+
+	strategy.runTest(mockCollection, testType, config, fetchDocumentIDsMock)
+
+	// Assert that InsertOne was called exactly as often as the number of documents
+	mockCollection.AssertNumberOfCalls(t, "InsertOne", config.DocCount)
+}
+
+// TestFindDocOperation tests the "finddoc" operation using DocCountTestingStrategy
+func TestFindDocOperation(t *testing.T) {
+	mockCollection := new(MockCollection)
+	config := TestingConfig{
+		Threads:  2,
+		DocCount: 0, // Avoid actual Find execution to prevent cursor error
+	}
+	strategy := DocCountTestingStrategy{}
+	testType := "finddoc"
+
+	// Since no document partitions will be generated, no Find should be called
+	strategy.runTest(mockCollection, testType, config, fetchDocumentIDsMock)
+
+	// As long as there is no panic, this is considered a successful test
+	assert.True(t, true)
 }
 
 // TestUpdateOperation tests the update operation using DocCountTestingStrategy

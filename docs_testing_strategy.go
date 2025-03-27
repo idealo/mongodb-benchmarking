@@ -235,8 +235,9 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 							"author":    1,
 							"title":     1,
 							"timestamp": 1,
-						}).
-						SetSort(bson.D{{Key: "timestamp", Value: -1}})
+						})
+						//.
+						//	SetSort(bson.D{{Key: "timestamp", Value: -1}})
 
 					cursor, err := collection.Find(context.Background(), filter, opts)
 					if err != nil {

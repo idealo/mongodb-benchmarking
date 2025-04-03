@@ -46,8 +46,8 @@ After building the tool, run it with customizable parameters:
   - `update`: The tool will update existing documents (requires that documents have been inserted in a prior run).
   - `delete`: The tool will delete existing documents. (just if `docs` is given)
   - `upsert`: The tool will perform upserts, repeatedly updating a specified range. (just if `docs` is given)
-  - `runAll`: Runs the `insert`, `update`, `delete`, and `upsert` tests sequentially. (just if `docs` is given)
-  - `runAll`: Runs the `insert`, `update` tests sequentially. (just if `duration` is given)
+- `runAll`: Runs the `insert`, `update`, `delete`, and `upsert` tests sequentially. (just if `docs` is given)
+- `runAll`: Runs the `insert`, `update` tests sequentially. (just if `duration` is given)
 
 ### Example Commands
 

@@ -28,7 +28,7 @@ func (t DurationTestingStrategy) runTestSequence(collection CollectionAPI, confi
 }
 
 func (t DurationTestingStrategy) runTestSequenceDoc(collection CollectionAPI, config TestingConfig) {
-	tests := []string{"insertdoc", "finddoc"}
+	tests := []string{"insertDoc", "findDoc"}
 	for _, test := range tests {
 		t.runTest(collection, test, config, fetchDocumentIDs)
 	}
@@ -36,7 +36,7 @@ func (t DurationTestingStrategy) runTestSequenceDoc(collection CollectionAPI, co
 
 func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI, int64, string) ([]primitive.ObjectID, error)) {
 	var partitions [][]primitive.ObjectID
-	if testType == "insert" || testType == "insertdoc" {
+	if testType == "insert" || testType == "insertDoc" {
 		if config.DropDb {
 			if err := collection.Drop(context.Background()); err != nil {
 				log.Fatalf("Failed to clear collection before test: %v", err)
@@ -47,9 +47,9 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 		}
 
 		// todo: prevent code duplicates
-		// Create indexes before insertdoc test begins
-		if testType == "insertdoc" && config.CreateIndex == true {
-			log.Println("Creating indexes for insertdoc benchmark...")
+		// Create indexes before insertDoc test begins
+		if testType == "insertDoc" && config.CreateIndex {
+			log.Println("Creating indexes for insertDoc benchmark...")
 
 			indexes := []mongo.IndexModel{
 				{Keys: bson.D{{Key: "author", Value: 1}}},
@@ -90,7 +90,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 		for i, id := range docIDs {
 			partitions[i%config.Threads] = append(partitions[i%config.Threads], id)
 		}
-	} else if testType == "finddoc" {
+	} else if testType == "findDoc" {
 
 		partitions = make([][]primitive.ObjectID, config.Threads)
 		for i := 0; i < config.DocCount; i++ {
@@ -158,7 +158,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 				}
 			}()
 		}
-	} else if testType == "insertdoc" {
+	} else if testType == "insertDoc" {
 		for i := 0; i < config.Threads; i++ {
 			go func() {
 				defer wg.Done()
@@ -170,12 +170,12 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 					if err == nil {
 						insertRate.Mark(1)
 					} else {
-						log.Printf("Insertdoc failed: %v", err)
+						log.Printf("InsertDoc failed: %v", err)
 					}
 				}
 			}()
 		}
-	} else { // update and finddoc operations
+	} else { // update and findDoc operations
 		for i := 0; i < config.Threads; i++ {
 			// Check if the partition is non-empty for this thread
 			if len(partitions) <= i || len(partitions[i]) == 0 {
@@ -201,7 +201,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 						} else {
 							log.Printf("Update failed for _id %v: %v", docID, err)
 						}
-					case "finddoc":
+					case "findDoc":
 
 						filter := queryGenerator.Generate()
 

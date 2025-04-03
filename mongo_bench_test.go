@@ -89,16 +89,16 @@ func TestInsertOperation(t *testing.T) {
 	mockCollection.AssertNumberOfCalls(t, "InsertOne", config.DocCount)
 }
 
-// TestInsertDocOperation tests the "insertdoc" operation using DocCountTestingStrategy
+// TestInsertDocOperation tests the "insertDoc" operation using DocCountTestingStrategy
 func TestInsertDocOperation(t *testing.T) {
 	mockCollection := new(MockCollection)
 	config := TestingConfig{
 		Threads:  2,
 		DocCount: 10,
-		DropDb:   false, // Collection is not dropped for insertdoc
+		DropDb:   false, // Collection is not dropped for insertDoc
 	}
 	strategy := DocCountTestingStrategy{}
-	testType := "insertdoc"
+	testType := "insertDoc"
 
 	// Expectation: InsertOne should be called once for each document
 	mockCollection.On("InsertOne", mock.Anything, mock.Anything).Return(&mongo.InsertOneResult{}, nil)
@@ -109,7 +109,7 @@ func TestInsertDocOperation(t *testing.T) {
 	mockCollection.AssertNumberOfCalls(t, "InsertOne", config.DocCount)
 }
 
-// TestFindDocOperation tests the "finddoc" operation using DocCountTestingStrategy
+// TestFindDocOperation tests the "findDoc" operation using DocCountTestingStrategy
 func TestFindDocOperation(t *testing.T) {
 	mockCollection := new(MockCollection)
 	config := TestingConfig{
@@ -117,7 +117,7 @@ func TestFindDocOperation(t *testing.T) {
 		DocCount: 0, // Avoid actual Find execution to prevent cursor error
 	}
 	strategy := DocCountTestingStrategy{}
-	testType := "finddoc"
+	testType := "findDoc"
 
 	// Since no document partitions will be generated, no Find should be called
 	strategy.runTest(mockCollection, testType, config, fetchDocumentIDsMock)

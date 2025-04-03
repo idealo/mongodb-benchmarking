@@ -27,14 +27,14 @@ func (t DocCountTestingStrategy) runTestSequence(collection CollectionAPI, confi
 }
 
 func (t DocCountTestingStrategy) runTestSequenceDoc(collection CollectionAPI, config TestingConfig) {
-	tests := []string{"insertdoc", "finddoc"}
+	tests := []string{"insertDoc", "findDoc"}
 	for _, test := range tests {
 		t.runTest(collection, test, config, fetchDocumentIDs)
 	}
 }
 
 func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType string, config TestingConfig, fetchDocIDs func(CollectionAPI, int64, string) ([]primitive.ObjectID, error)) {
-	if testType == "insert" || testType == "upsert" || testType == "insertdoc" {
+	if testType == "insert" || testType == "upsert" || testType == "insertDoc" {
 		if config.DropDb {
 			if err := collection.Drop(context.Background()); err != nil {
 				log.Fatalf("Failed to drop collection: %v", err)
@@ -47,9 +47,9 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 		log.Printf("Starting %s test...\n", testType)
 	}
 
-	// Create indexes before insertdoc test begins
-	if testType == "insertdoc" && config.CreateIndex == true {
-		log.Println("Creating indexes for insertdoc benchmark...")
+	// Create indexes before insertDoc test begins
+	if testType == "insertDoc" && config.CreateIndex {
+		log.Println("Creating indexes for insertDoc benchmark...")
 
 		indexes := []mongo.IndexModel{
 			{Keys: bson.D{{Key: "author", Value: 1}}},
@@ -92,7 +92,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 			partitions[i%threads] = append(partitions[i%threads], id)
 		}
 
-	case "insert", "upsert", "insertdoc":
+	case "insert", "upsert", "insertDoc":
 		partitions = make([][]primitive.ObjectID, threads)
 		for i := 0; i < docCount; i++ {
 			partitions[i%threads] = append(partitions[i%threads], primitive.NewObjectID())
@@ -109,7 +109,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 			docID := docIDs[rand.Intn(len(docIDs))]
 			partitions[i%threads] = append(partitions[i%threads], docID)
 		}
-	case "finddoc":
+	case "findDoc":
 		partitions = make([][]primitive.ObjectID, threads)
 		for i := 0; i < docCount; i++ {
 			partitions[i%threads] = append(partitions[i%threads], primitive.NewObjectID())
@@ -182,13 +182,13 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 					} else {
 						log.Printf("Insert failed: %v", err)
 					}
-				case "insertdoc":
+				case "insertDoc":
 					doc = docGen.GenerateComplex(i)
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
 						insertRate.Mark(1)
 					} else {
-						log.Printf("Insertdoc failed: %v", err)
+						log.Printf("InsertDoc failed: %v", err)
 					}
 				case "update":
 					randomDocID := partition[rand.Intn(len(partition))]
@@ -224,7 +224,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 					if result.DeletedCount > 0 {
 						insertRate.Mark(1)
 					}
-				case "finddoc":
+				case "findDoc":
 
 					filter := queryGenerator.Generate()
 

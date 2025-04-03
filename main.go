@@ -25,14 +25,14 @@ func main() {
 	flag.IntVar(&threads, "threads", 10, "Number of threads for inserting, updating, upserting, or deleting documents")
 	flag.IntVar(&docCount, "docs", 1000, "Total number of documents to insert, insertdoc, update, upsert, or delete")
 	flag.StringVar(&uri, "uri", "mongodb://localhost:27017", "MongoDB URI")
-	flag.StringVar(&testType, "type", "insert", "Test type: insert, update, upsert, delete, insertdoc or finddoc")
+	flag.StringVar(&testType, "type", "insert", "Test type: insert, update, upsert, delete, insertDoc or findDoc")
 	flag.BoolVar(&runAll, "runAll", false, "Run all tests in order: insert, update, delete, upsert")
 	flag.IntVar(&duration, "duration", 0, "Duration in seconds to run the test")
 	flag.BoolVar(&largeDocs, "largeDocs", false, "Use large documents for testing")
 	flag.BoolVar(&dropDb, "dropDb", true, "Drop the database before running the test")
 	flag.StringVar(&outputFilePrefix, "out", "", "Output filename prefix (default: empty, using 'benchmark_results_*'")
-	flag.BoolVar(&createIndex, "createIndex", false, "Create indexes before running insertdoc operation")
-	flag.IntVar(&queryType, "queryType", 0, "Query type for finddoc operation, default 0 for random")
+	flag.BoolVar(&createIndex, "createIndex", false, "Create indexes before running insertDoc operation")
+	flag.IntVar(&queryType, "queryType", 0, "Query type for findDoc operation, default 0 for random")
 	flag.Parse()
 
 	var strategy TestingStrategy

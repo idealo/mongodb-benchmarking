@@ -41,19 +41,19 @@ After building the tool, run it with customizable parameters:
 - `-largeDocs`: Use large documents (2K) (default: false).
 - `-dropDb`: Drop the database before running the test (default: true).
 - `-uri`: MongoDB connection URI.
-- `-createIndex`: Create indexes (just in `insertdoc` mode)
+- `-createIndex`: Create indexes (just in `insertDoc` mode)
 - `-out`: Output file prefix. (Default: empty, using "benchmark_results_*")
 
-- `-type`: Type of test to run. Accepts `insert`, `update`, `delete`, `upsert`, `insertdoc`, `finddoc`, `runDoc` or `runAll`:
+- `-type`: Type of test to run. Accepts `insert`, `update`, `delete`, `upsert`, `insertDoc`, `findDoc`, `runDoc` or `runAll`:
   - `insert`: The tool will insert new documents.
-  - `insertdoc`: The tool will insert new more complex documents to simulate real-life data.
-  - `finddoc`: The tool will create random find requests on the complex documents created by `insertdoc` operation to simulate real-life requests.
+  - `insertDoc`: The tool will insert new more complex documents to simulate real-life data.
+  - `findDoc`: The tool will create random find requests on the complex documents created by `insertDoc` operation to simulate real-life requests.
   - `update`: The tool will update existing documents (requires that documents have been inserted in a prior run).
   - `delete`: The tool will delete existing documents. (just if `docs` is given)
   - `upsert`: The tool will perform upserts, repeatedly updating a specified range. (just if `docs` is given)
   - `runAll`: Runs the `insert`, `update`, `delete`, and `upsert` tests sequentially. (just if `docs` is given)
-  - `runAll`: Runs the `insert`, `insertdoc`, `update` tests sequentially. (just if `duration` is given)
-  - `runDoc`: Runs the `insertdoc` and `finddoc` tests sequentially.
+  - `runAll`: Runs the `insert`, `insertDoc`, `update` tests sequentially. (just if `duration` is given)
+  - `runDoc`: Runs the `insertDoc` and `findDoc` tests sequentially.
 
 ### Example Commands
 
@@ -145,11 +145,11 @@ The generated documents follow a fixed structure and are suitable for testing mo
 - `timestamp`: random date from the last two years
 - `views`, `comments`, `likes`, `shares`: numeric counters for simulated engagement
 
-This generator is used in the `"insertdoc"` and `"finddoc"` operations and enables benchmarking scenarios that are closer to real-world usage patterns while maintaining reproducibility.
+This generator is used in the `"insertDoc"` and `"findDoc"` operations and enables benchmarking scenarios that are closer to real-world usage patterns while maintaining reproducibility.
 
 ## Query Generator
 
-To support realistic **read benchmarks**, the suite includes a `QueryGenerator` used in the `finddoc` operation. Instead of issuing uniform or synthetic queries, this generator produces a variety of randomized but meaningful MongoDB filters that reflect real-world use cases.
+To support realistic **read benchmarks**, the suite includes a `QueryGenerator` used in the `findDoc` operation. Instead of issuing uniform or synthetic queries, this generator produces a variety of randomized but meaningful MongoDB filters that reflect real-world use cases.
 
 Each query is randomly selected from a set of common patterns:
 

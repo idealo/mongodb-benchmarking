@@ -7,7 +7,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-// QueryGenerator provides random filters for benchmarking find operations
+// QueryGenerator provides methods for generating randomized MongoDB query filters,
+// used for benchmarking various types of find operations. It supports multiple
+// query strategies, including filtering by author, tags, timestamp, or full-text search.
 type QueryGenerator struct {
 	rnd       *rand.Rand
 	queryType int
@@ -15,9 +17,10 @@ type QueryGenerator struct {
 	tags      []string
 }
 
-// NewQueryGenerator initializes a new QueryGenerator with sample data
+// NewQueryGenerator initializes and returns a new QueryGenerator.
+// It accepts a queryType parameter to control the query strategy:
+// if queryType is 0, a random query type will be chosen at each call to Generate.
 func NewQueryGenerator(queryType int) *QueryGenerator {
-
 	src := rand.NewSource(time.Now().UnixNano())
 	return &QueryGenerator{
 		rnd:       rand.New(src),
@@ -32,7 +35,15 @@ func NewQueryGenerator(queryType int) *QueryGenerator {
 	}
 }
 
-// Generate returns a randomly selected filter for a complex find operation
+// Generate returns a randomized MongoDB filter (bson.M) based on the configured query type.
+// Supported query types:
+//
+//	1 - Match a single author
+//	2 - Match a single tag using $elemMatch
+//	3 - Filter documents with timestamps greater than a recent random time
+//	4 - Perform a full-text search on tags
+//
+// If queryType is set to 0, one of the above is chosen at random.
 func (g *QueryGenerator) Generate() bson.M {
 	var queryType int
 

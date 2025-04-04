@@ -41,7 +41,7 @@ After building the tool, run it with customizable parameters:
 - `-largeDocs`: Use large documents (2K) (default: false).
 - `-dropDb`: Drop the database before running the test (default: true).
 - `-uri`: MongoDB connection URI.
-- `-createIndex`: Create indexes (just in `insertDoc` mode)
+- `-useIndex`: Create indexes (just in `insertDoc` mode), use them in `findDoc`
 - `-out`: Output file prefix. (Default: empty, using "benchmark_results_*")
 
 - `-type`: Type of test to run. Accepts `insert`, `update`, `delete`, `upsert`, `insertDoc`, `findDoc`, `runDoc` or `runAll`:

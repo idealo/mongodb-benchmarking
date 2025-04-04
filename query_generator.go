@@ -13,6 +13,7 @@ import (
 type QueryGenerator struct {
 	rnd       *rand.Rand
 	queryType int
+	useIndex  bool
 	authors   []string
 	tags      []string
 }
@@ -20,11 +21,12 @@ type QueryGenerator struct {
 // NewQueryGenerator initializes and returns a new QueryGenerator.
 // It accepts a queryType parameter to control the query strategy:
 // if queryType is 0, a random query type will be chosen at each call to Generate.
-func NewQueryGenerator(queryType int) *QueryGenerator {
+func NewQueryGenerator(queryType int, useIndex bool) *QueryGenerator {
 	src := rand.NewSource(time.Now().UnixNano())
 	return &QueryGenerator{
 		rnd:       rand.New(src),
 		queryType: queryType,
+		useIndex:  useIndex,
 		authors: []string{
 			"Alice Example", "John Doe", "Maria Sample", "Max Mustermann",
 			"Sophie Miller", "Liam Johnson", "Emma Brown", "Noah Davis",
@@ -48,7 +50,11 @@ func (g *QueryGenerator) Generate() bson.M {
 	var queryType int
 
 	if g.queryType == 0 {
-		queryType = g.rnd.Intn(4) + 1
+		if g.useIndex {
+			queryType = g.rnd.Intn(4) + 1
+		} else {
+			queryType = g.rnd.Intn(3) + 1
+		}
 	} else {
 		queryType = g.queryType
 	}
@@ -64,7 +70,7 @@ func (g *QueryGenerator) Generate() bson.M {
 		past := time.Now().Add(-time.Duration(g.rnd.Intn(365*12)) * time.Hour)
 		return bson.M{"timestamp": bson.M{"$gt": past}}
 	case 4:
-		// Full-text search
+		// Full-text search, only if the index is used
 		return bson.M{"$text": bson.M{"$search": g.tags[g.rnd.Intn(len(g.tags))]}}
 	default:
 		return bson.M{}

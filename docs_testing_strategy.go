@@ -48,7 +48,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	}
 
 	// Create indexes before insertDoc test begins
-	if testType == "insertDoc" && config.CreateIndex {
+	if testType == "insertDoc" && config.UseIndex {
 		log.Println("Creating indexes for insertDoc benchmark...")
 
 		indexes := []mongo.IndexModel{
@@ -112,7 +112,10 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	case "findDoc":
 		partitions = make([][]primitive.ObjectID, threads)
 		for i := 0; i < docCount; i++ {
-			partitions[i%threads] = append(partitions[i%threads], primitive.NewObjectID())
+			// Use empty ObjectId for findDoc
+			// This is just a placeholder, as the actual document ID is not used
+			// in the find operation, but is needed for partitioning
+			partitions[i%threads] = append(partitions[i%threads], primitive.ObjectID{})
 		}
 
 	default:
@@ -126,11 +129,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 	var doc interface{}
 
-	queryGenerator := NewQueryGenerator(config.QueryType)
-	/*var data = make([]byte, 1024*2)
-	for i := 0; i < len(data); i++ {
-		data[i] = byte(rand.Intn(256))
-	}*/
+	queryGenerator := NewQueryGenerator(config.QueryType, config.UseIndex)
 
 	secondTicker := time.NewTicker(1 * time.Second)
 	defer secondTicker.Stop()

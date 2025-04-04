@@ -19,7 +19,7 @@ func main() {
 	var runAll bool
 	var largeDocs bool
 	var dropDb bool
-	var createIndex bool
+	var useIndex bool
 	var queryType int
 
 	flag.IntVar(&threads, "threads", 10, "Number of threads for inserting, updating, upserting, or deleting documents")
@@ -31,7 +31,7 @@ func main() {
 	flag.BoolVar(&largeDocs, "largeDocs", false, "Use large documents for testing")
 	flag.BoolVar(&dropDb, "dropDb", true, "Drop the database before running the test")
 	flag.StringVar(&outputFilePrefix, "out", "", "Output filename prefix (default: empty, using 'benchmark_results_*'")
-	flag.BoolVar(&createIndex, "createIndex", false, "Create indexes before running insertDoc operation")
+	flag.BoolVar(&useIndex, "useIndex", false, "Create indexes before running insertDoc operation, use them for findDoc")
 	flag.IntVar(&queryType, "queryType", 0, "Query type for findDoc operation, default 0 for random")
 	flag.Parse()
 
@@ -60,7 +60,7 @@ func main() {
 			LargeDocs:        largeDocs,
 			DropDb:           dropDb,
 			OutputFilePrefix: outputFilePrefix,
-			CreateIndex:      createIndex,
+			UseIndex:         useIndex,
 			QueryType:        queryType,
 		}
 		strategy = DurationTestingStrategy{}
@@ -71,7 +71,7 @@ func main() {
 			LargeDocs:        largeDocs,
 			DropDb:           dropDb,
 			OutputFilePrefix: outputFilePrefix,
-			CreateIndex:      createIndex,
+			UseIndex:         useIndex,
 			QueryType:        queryType,
 		}
 		strategy = DocCountTestingStrategy{}

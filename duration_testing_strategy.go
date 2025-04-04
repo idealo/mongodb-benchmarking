@@ -48,7 +48,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 		// todo: prevent code duplicates
 		// Create indexes before insertDoc test begins
-		if testType == "insertDoc" && config.CreateIndex {
+		if testType == "insertDoc" && config.UseIndex {
 			log.Println("Creating indexes for insertDoc benchmark...")
 
 			indexes := []mongo.IndexModel{
@@ -91,11 +91,14 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 			partitions[i%config.Threads] = append(partitions[i%config.Threads], id)
 		}
 	} else if testType == "findDoc" {
-
 		partitions = make([][]primitive.ObjectID, config.Threads)
 		for i := 0; i < config.DocCount; i++ {
-			partitions[i%config.Threads] = append(partitions[i%config.Threads], primitive.NewObjectID())
+			// Use empty ObjectId for findDoc
+			// This is just a placeholder, as the actual document ID is not used
+			// in the find operation, but is needed for partitioning
+			partitions[i%config.Threads] = append(partitions[i%config.Threads], primitive.ObjectID{})
 		}
+
 	}
 
 	var doc interface{}
@@ -132,7 +135,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 	// Launch the workload in goroutines
 	var wg sync.WaitGroup
 	wg.Add(config.Threads)
-	queryGenerator := NewQueryGenerator(config.QueryType)
+	queryGenerator := NewQueryGenerator(config.QueryType, config.UseIndex)
 
 	if testType == "insert" {
 		// Insert operations using generated IDs

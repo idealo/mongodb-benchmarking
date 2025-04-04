@@ -9,7 +9,7 @@ type TestingConfig struct {
 	LargeDocs        bool
 	DropDb           bool
 	OutputFilePrefix string
-	CreateIndex      bool
+	UseIndex         bool
 	QueryType        int
 }
 

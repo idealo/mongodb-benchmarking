@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -25,6 +26,7 @@ type DocumentGenerator struct {
 	data     []byte
 	tags     []string
 	authors  []string
+	guests   []string
 	category []string
 	lorem    []string
 }
@@ -35,11 +37,18 @@ type DocumentGenerator struct {
 func NewDocumentGenerator() *DocumentGenerator {
 	// Init once
 	src := rand.NewSource(time.Now().UnixNano())
+	// generate guests like: guest_0001, ..., guest_9999
+	guests := make([]string, 10000)
+	for i := range guests {
+		guests[i] = fmt.Sprintf("guest_%04d", i)
+	}
+
 	return &DocumentGenerator{
 		rnd:      rand.New(src),
 		data:     make([]byte, 1024*2),
 		tags:     []string{"MongoDB", "Benchmark", "CMS", "Database", "Performance", "WebApp", "Scalability", "Indexing", "Query Optimization", "Sharding"},
 		authors:  []string{"Alice Example", "John Doe", "Maria Sample", "Max Mustermann", "Sophie Miller", "Liam Johnson", "Emma Brown", "Noah Davis", "Olivia Wilson", "William Martinez"},
+		guests:   guests,
 		category: []string{"Tech", "Business", "Science", "Health", "Sports", "Education"},
 		lorem: []string{
 			"Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
@@ -90,6 +99,7 @@ func (g *DocumentGenerator) GenerateComplex(threadRunCount int) bson.M {
 	coAuthors := g.randomSample(g.authors, numCoAuthors)
 	category := g.category[g.rnd.Intn(len(g.category))]
 	author := g.authors[g.rnd.Intn(len(g.authors))]
+	guest := g.guests[g.rnd.Intn(len(g.guests))]
 
 	return bson.M{
 		"threadRunCount": threadRunCount,
@@ -97,6 +107,7 @@ func (g *DocumentGenerator) GenerateComplex(threadRunCount int) bson.M {
 		"v":              1,
 		"title":          g.generateLoremIpsum(30),
 		"author":         author,
+		"guest":          guest,
 		"co_authors":     coAuthors,
 		"summary":        g.generateLoremIpsum(100),
 		"content":        g.generateLoremIpsum(2000 + g.rnd.Intn(3000)),

@@ -10,7 +10,9 @@ type TestingConfig struct {
 	DropDb           bool
 	OutputFilePrefix string
 	UseIndex         bool
+	UseIndexFullText bool
 	QueryType        int
+	Limit            int
 }
 
 type TestingStrategy interface {

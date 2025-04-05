@@ -53,9 +53,14 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 		indexes := []mongo.IndexModel{
 			{Keys: bson.D{{Key: "author", Value: 1}}},
+			{Keys: bson.D{{Key: "guest", Value: 1}}},
 			{Keys: bson.D{{Key: "tags", Value: 1}}},
 			{Keys: bson.D{{Key: "timestamp", Value: -1}}},
-			{Keys: bson.D{{Key: "content", Value: "text"}}},
+		}
+		if config.UseIndexFullText {
+			indexes = append(indexes, mongo.IndexModel{
+				Keys: bson.D{{Key: "content", Value: "text"}},
+			})
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -125,11 +130,11 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	// Start the ticker just before starting the main workload goroutines
 	insertRate := metrics.NewMeter()
 	var records [][]string
-	records = append(records, []string{"t", "count", "mean", "m1_rate", "m5_rate", "m15_rate", "mean_rate"})
+	records = append(records, []string{"t", "count", "mean", "m1_rate", "m5_rate", "m15_rate"})
 
 	var doc interface{}
 
-	queryGenerator := NewQueryGenerator(config.QueryType, config.UseIndex)
+	queryGenerator := NewQueryGenerator(config.QueryType, config.UseIndex, config.UseIndexFullText)
 
 	secondTicker := time.NewTicker(1 * time.Second)
 	defer secondTicker.Stop()
@@ -228,10 +233,11 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 					filter := queryGenerator.Generate()
 
 					opts := options.Find().
-						SetLimit(10).
+						SetLimit(int64(config.Limit)).
 						SetProjection(bson.M{
 							"_id":       1,
 							"author":    1,
+							"guest":     1,
 							"title":     1,
 							"timestamp": 1,
 						})

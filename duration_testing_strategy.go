@@ -53,9 +53,14 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 			indexes := []mongo.IndexModel{
 				{Keys: bson.D{{Key: "author", Value: 1}}},
+				{Keys: bson.D{{Key: "guest", Value: 1}}},
 				{Keys: bson.D{{Key: "tags", Value: 1}}},
 				{Keys: bson.D{{Key: "timestamp", Value: -1}}},
-				{Keys: bson.D{{Key: "content", Value: "text"}}},
+			}
+			if config.UseIndexFullText {
+				indexes = append(indexes, mongo.IndexModel{
+					Keys: bson.D{{Key: "content", Value: "text"}},
+				})
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -135,7 +140,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 	// Launch the workload in goroutines
 	var wg sync.WaitGroup
 	wg.Add(config.Threads)
-	queryGenerator := NewQueryGenerator(config.QueryType, config.UseIndex)
+	queryGenerator := NewQueryGenerator(config.QueryType, config.UseIndex, config.UseIndexFullText)
 
 	if testType == "insert" {
 		// Insert operations using generated IDs
@@ -209,10 +214,11 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 						filter := queryGenerator.Generate()
 
 						opts := options.Find().
-							SetLimit(10).
+							SetLimit(int64(config.Limit)).
 							SetProjection(bson.M{
 								"_id":       1,
 								"author":    1,
+								"guest":     1,
 								"title":     1,
 								"timestamp": 1,
 							}) //.

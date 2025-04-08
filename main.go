@@ -45,21 +45,17 @@ func main() {
 	collection := client.Database("benchmarking").Collection("testdata")
 	mongoCollection := &MongoDBCollection{Collection: collection}
 
+	config = TestingConfig{
+		Threads:   threads,
+		Duration:  duration,
+		DocCount:  docCount,
+		LargeDocs: largeDocs,
+		DropDb:    dropDb,
+	}
+
 	if duration > 0 {
-		config = TestingConfig{
-			Threads:   threads,
-			Duration:  duration,
-			LargeDocs: largeDocs,
-			DropDb:    dropDb,
-		}
 		strategy = DurationTestingStrategy{}
 	} else {
-		config = TestingConfig{
-			Threads:   threads,
-			DocCount:  docCount,
-			LargeDocs: largeDocs,
-			DropDb:    dropDb,
-		}
 		strategy = DocCountTestingStrategy{}
 	}
 	if runAll {

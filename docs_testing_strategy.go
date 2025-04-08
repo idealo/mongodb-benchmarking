@@ -9,7 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
-	"math/rand"
 	"os"
 	"sync"
 	"time"
@@ -42,6 +41,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 	var threads = config.Threads
 	var docCount = config.DocCount
+	random := NewRandomizer()
 
 	// Prepare partitions based on test type
 	switch testType {
@@ -70,7 +70,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 		partitions = make([][]primitive.ObjectID, threads)
 		for i := 0; i < len(docIDs); i++ {
-			docID := docIDs[rand.Intn(len(docIDs))]
+			docID := docIDs[random.RandomIntn(len(docIDs))]
 			partitions[i%threads] = append(partitions[i%threads], docID)
 		}
 	}
@@ -83,7 +83,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	var doc interface{}
 	var data = make([]byte, 1024*2)
 	for i := 0; i < len(data); i++ {
-		data[i] = byte(rand.Intn(256))
+		data[i] = byte(random.RandomIntn(256))
 	}
 
 	secondTicker := time.NewTicker(1 * time.Second)
@@ -119,13 +119,14 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	for i := 0; i < threads; i++ {
 		go func(partition []primitive.ObjectID) {
 			defer wg.Done()
+			r := NewRandomizer()
 			for _, docID := range partition {
 				switch testType {
 				case "insert":
 					if config.LargeDocs {
-						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1, "data": data}
+						doc = bson.M{"threadRunCount": i, "rnd": r.RandomInt63(), "v": 1, "data": data}
 					} else {
-						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
+						doc = bson.M{"threadRunCount": i, "rnd": r.RandomInt63(), "v": 1}
 					}
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
@@ -134,9 +135,9 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 						log.Printf("Insert failed: %v", err)
 					}
 				case "update":
-					randomDocID := partition[rand.Intn(len(partition))]
+					randomDocID := partition[r.RandomIntn(len(partition))]
 					filter := bson.M{"_id": randomDocID}
-					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
+					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": r.RandomInt63()}}
 					_, err := collection.UpdateOne(context.Background(), filter, update)
 					if err == nil {
 						insertRate.Mark(1)
@@ -145,9 +146,9 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 					}
 
 				case "upsert":
-					randomDocID := partition[rand.Intn(len(partition)/2)]
+					randomDocID := partition[r.RandomIntn(len(partition)/2)]
 					filter := bson.M{"_id": randomDocID}
-					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
+					update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": r.RandomInt63()}}
 					opts := options.Update().SetUpsert(true)
 					_, err := collection.UpdateOne(context.Background(), filter, update, opts)
 					if err == nil {

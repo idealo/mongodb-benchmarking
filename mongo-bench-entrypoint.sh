@@ -22,6 +22,17 @@ elif [ "$DOC_COUNT" -ne 80055 ]; then
   exit 1
 fi
 
+# Run the update test
+echo 'Running update test...'
+./mongo-bench --uri mongodb://root:example@mongodb:27017 --type update --threads 10 --docs 80055
+echo 'Checking document count...'
+DOC_COUNT=$(mongosh 'mongodb://root:example@mongodb:27017/?authSource=admin' --quiet --eval 'JSON.stringify({count: db.getSiblingDB("benchmarking").testdata.countDocuments()})' | jq -r '.count')
+if [ "$DOC_COUNT" -ne 80055 ]; then
+  echo "Error: Expected 80055 documents, found $DOC_COUNT"
+  exit 1
+fi
+
+
 # Run the delete test
 echo 'Running delete test...'
 ./mongo-bench --uri mongodb://root:example@mongodb:27017 --type delete --threads 10 --docs 80055
@@ -55,6 +66,12 @@ if [ $? -ne 0 ]; then
 fi
 
 echo 'Running duration test...'
+./mongo-bench --duration 10  --threads 10 -type insert --uri mongodb://root:example@mongodb:27017
+if [ $? -ne 0 ]; then
+  echo 'Error: duration test with insert failed.'
+  exit 1
+fi
+
 ./mongo-bench --duration 10  --threads 10 -type update --uri mongodb://root:example@mongodb:27017
 if [ $? -ne 0 ]; then
   echo 'Error: duration test with update failed.'

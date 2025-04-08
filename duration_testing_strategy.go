@@ -95,16 +95,17 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 	if testType == "insert" {
 		// Insert operations using generated IDs
 		for i := 0; i < config.Threads; i++ {
-			go func() {
+			threadID := i
+			go func(threadID int) {
 				defer wg.Done()
 				r := NewRandomizer()
 
 				for time.Now().Before(endTime) {
 					if config.LargeDocs {
-						doc = bson.M{"threadRunCount": i, "rnd": r.RandomInt63(), "v": 1, "data": data}
+						doc = bson.M{"threadRunCount": threadID, "rnd": r.RandomInt63(), "v": 1, "data": data}
 
 					} else {
-						doc = bson.M{"threadRunCount": i, "rnd": r.RandomInt63(), "v": 1}
+						doc = bson.M{"threadRunCount": threadID, "rnd": r.RandomInt63(), "v": 1}
 					}
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
@@ -113,7 +114,7 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 						log.Printf("Insert failed: %v", err)
 					}
 				}
-			}()
+			}(threadID)
 		}
 	} else {
 		for i := 0; i < config.Threads; i++ {

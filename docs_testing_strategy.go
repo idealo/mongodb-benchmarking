@@ -117,16 +117,17 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	wg.Add(threads)
 
 	for i := 0; i < threads; i++ {
-		go func(partition []primitive.ObjectID) {
+		threadID := i
+		go func(partition []primitive.ObjectID, threadID int) {
 			defer wg.Done()
 			r := NewRandomizer()
 			for _, docID := range partition {
 				switch testType {
 				case "insert":
 					if config.LargeDocs {
-						doc = bson.M{"threadRunCount": i, "rnd": r.RandomInt63(), "v": 1, "data": data}
+						doc = bson.M{"threadRunCount": threadID, "rnd": r.RandomInt63(), "v": 1, "data": data}
 					} else {
-						doc = bson.M{"threadRunCount": i, "rnd": r.RandomInt63(), "v": 1}
+						doc = bson.M{"threadRunCount": threadID, "rnd": r.RandomInt63(), "v": 1}
 					}
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
@@ -170,7 +171,7 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 					}
 				}
 			}
-		}(partitions[i])
+		}(partitions[i], threadID)
 	}
 
 	wg.Wait()
@@ -198,7 +199,12 @@ func (t DocCountTestingStrategy) runTest(collection CollectionAPI, testType stri
 	if err != nil {
 		log.Fatalf("Failed to create CSV file: %v", err)
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			log.Printf("Failed to close file: %v", err)
+		}
+	}(file)
 
 	writer := csv.NewWriter(file)
 	if err := writer.WriteAll(records); err != nil {

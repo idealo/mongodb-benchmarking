@@ -40,7 +40,7 @@ echo 'Running upsert test...'
 echo 'Checking document count...'
 DOC_COUNT=$(mongosh 'mongodb://root:example@mongodb:27017/?authSource=admin' --quiet --eval 'JSON.stringify({count: db.getSiblingDB("benchmarking").testdata.countDocuments()})' | jq -r '.count')
 if [ "$DOC_COUNT" -gt 0 ]; then
-  echo 'All tests passed successfully.'
+  echo 'Single tests passed successfully.'
 else
   echo "Error: Expected >0 documents, found $DOC_COUNT"
   exit 1
@@ -49,6 +49,14 @@ fi
 # Run the all test
 echo 'Running all test...'
 ./mongo-bench --uri mongodb://root:example@mongodb:27017 --runAll --threads 10 --docs 80000
+if [ $? -ne 0 ]; then
+  echo 'Error: docs test with runAll failed.'
+  exit 1
+fi
 
 echo 'Running duration test...'
 ./mongo-bench --duration 10  --threads 10 -type update --uri mongodb://root:example@mongodb:27017
+if [ $? -ne 0 ]; then
+  echo 'Error: duration test with update failed.'
+  exit 1
+fi

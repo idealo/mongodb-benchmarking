@@ -57,7 +57,11 @@ update: ## Update dependencies and tidy the go.mod file
 .PHONY: run-compose
 run-compose: ## Running integration tests
 	@echo "🔹 Starting integration tests with mongo in docker-compose ..."
-	docker-compose up --build
+	@docker-compose up --build -d
+	@docker-compose logs -f mongo-bench
+	@docker-compose down
+	@echo "✅  Integration tests completed!"
+
 
 reset: clean ## Reset the development environment
 	@echo "🔹 resetting dev environment"

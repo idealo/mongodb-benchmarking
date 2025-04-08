@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
-	"math/rand"
 	"os"
 	"sync"
 	"time"
@@ -52,10 +51,12 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 		}
 	}
 
+	random := NewRandomizer()
+
 	var doc interface{}
 	var data = make([]byte, 1024*2)
 	for i := 0; i < len(data); i++ {
-		data[i] = byte(rand.Intn(256))
+		data[i] = byte(random.RandomIntn(256))
 	}
 
 	endTime := time.Now().Add(time.Duration(config.Duration) * time.Second)
@@ -96,13 +97,14 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 		for i := 0; i < config.Threads; i++ {
 			go func() {
 				defer wg.Done()
+				r := NewRandomizer()
 
 				for time.Now().Before(endTime) {
 					if config.LargeDocs {
-						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1, "data": data}
+						doc = bson.M{"threadRunCount": i, "rnd": r.RandomInt63(), "v": 1, "data": data}
 
 					} else {
-						doc = bson.M{"threadRunCount": i, "rnd": rand.Int63(), "v": 1}
+						doc = bson.M{"threadRunCount": i, "rnd": r.RandomInt63(), "v": 1}
 					}
 					_, err := collection.InsertOne(context.Background(), doc)
 					if err == nil {
@@ -125,14 +127,15 @@ func (t DurationTestingStrategy) runTest(collection CollectionAPI, testType stri
 
 			go func(partition []primitive.ObjectID) {
 				defer wg.Done()
+				r := NewRandomizer()
 
 				for time.Now().Before(endTime) {
-					docID := partition[rand.Intn(len(partition))]
+					docID := partition[r.RandomIntn(len(partition))]
 
 					switch testType {
 					case "update":
 						filter := bson.M{"_id": docID}
-						update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": rand.Int63()}}
+						update := bson.M{"$set": bson.M{"updatedAt": time.Now().Unix(), "rnd": r.RandomInt63()}}
 						_, err := collection.UpdateOne(context.Background(), filter, update)
 						if err == nil {
 							insertRate.Mark(1)

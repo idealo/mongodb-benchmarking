@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: mongodb-benchmarking
+  description: mongo-bench is a high-performance benchmarking tool written in Golang designed to test and measure MongoDB insert, update, delete, and upsert rates under configurable conditions.
+  annotations:
+    github.com/project-slug: idealo/mongodb-benchmarking
+    github.com/team-slug: idealo/persistence
+spec:
+  type: service
+  lifecycle: production
+  owner: group:persistence
+  system: database-management-toolset

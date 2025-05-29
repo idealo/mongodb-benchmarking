@@ -1,6 +1,6 @@
-module benchmarking
+module github.com/idealo/mongodb-benchmarking
 
-go 1.24.0
+go 1.24
 
 require (
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475

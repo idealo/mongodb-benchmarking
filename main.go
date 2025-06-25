@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 
@@ -14,21 +15,21 @@ import (
 
 func main() {
 	var (
-		threads     int
-		docCount    int
-		uri         string
-		certificate string
-		testType    string
-		duration    int
-		runAll      bool
-		largeDocs   bool
-		dropDb      bool
+		threads         int
+		docCount        int
+		uri             string
+		certificatePath string
+		testType        string
+		duration        int
+		runAll          bool
+		largeDocs       bool
+		dropDb          bool
 	)
 
 	flag.IntVar(&threads, "threads", 10, "Number of threads for inserting, updating, upserting, or deleting documents")
 	flag.IntVar(&docCount, "docs", 1000, "Total number of documents to insert, update, upsert, or delete")
 	flag.StringVar(&uri, "uri", "mongodb://localhost:27017", "MongoDB URI")
-	flag.StringVar(&certificate, "cert", "", "Path to Tls certificate")
+	flag.StringVar(&certificatePath, "cert", "", "Path to Tls certificate")
 	flag.StringVar(&testType, "type", "insert", "Test type: insert, update, upsert, or delete")
 	flag.BoolVar(&runAll, "runAll", false, "Run all tests in order: insert, update, delete, upsert")
 	flag.IntVar(&duration, "duration", 0, "Duration in seconds to run the test")
@@ -41,10 +42,10 @@ func main() {
 
 	clientOptions := options.Client().ApplyURI(uri).SetMaxPoolSize(uint64(threads))
 
-	if len(certificate) != 0 {
-		tlsConfig, err := createTlsConfigFromFile(certificate)
+	if len(certificatePath) != 0 {
+		tlsConfig, err := createTlsConfigFromFile(certificatePath)
 		if err != nil {
-			log.Fatalf("Failed to create tls config from %s: %v", certificate, err)
+			log.Fatalf("Failed to create tls config from %s: %v", certificatePath, err)
 		}
 
 		clientOptions = clientOptions.SetTLSConfig(tlsConfig)
@@ -91,7 +92,9 @@ func createTlsConfigFromFile(tlsCertificate string) (*tls.Config, error) {
 	}
 
 	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
+	if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
+		return nil, fmt.Errorf("failed to parse certificate from %s", tlsCertificate)
+	}
 
 	return &tls.Config{
 		RootCAs: caCertPool,

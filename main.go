@@ -2,25 +2,33 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
+	"log"
+	"os"
+
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"log"
 )
 
 func main() {
-	var threads int
-	var docCount int
-	var uri string
-	var testType string
-	var duration int
-	var runAll bool
-	var largeDocs bool
-	var dropDb bool
+	var (
+		threads     int
+		docCount    int
+		uri         string
+		certificate string
+		testType    string
+		duration    int
+		runAll      bool
+		largeDocs   bool
+		dropDb      bool
+	)
 
 	flag.IntVar(&threads, "threads", 10, "Number of threads for inserting, updating, upserting, or deleting documents")
 	flag.IntVar(&docCount, "docs", 1000, "Total number of documents to insert, update, upsert, or delete")
 	flag.StringVar(&uri, "uri", "mongodb://localhost:27017", "MongoDB URI")
+	flag.StringVar(&certificate, "cert", "", "Path to Tls certificate")
 	flag.StringVar(&testType, "type", "insert", "Test type: insert, update, upsert, or delete")
 	flag.BoolVar(&runAll, "runAll", false, "Run all tests in order: insert, update, delete, upsert")
 	flag.IntVar(&duration, "duration", 0, "Duration in seconds to run the test")
@@ -31,7 +39,18 @@ func main() {
 	var strategy TestingStrategy
 	var config TestingConfig
 
-	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri).SetMaxPoolSize(uint64(threads)))
+	clientOptions := options.Client().ApplyURI(uri).SetMaxPoolSize(uint64(threads))
+
+	if len(certificate) != 0 {
+		tlsConfig, err := createTlsConfigFromFile(certificate)
+		if err != nil {
+			log.Fatalf("Failed to create tls config from %s: %v", certificate, err)
+		}
+
+		clientOptions = clientOptions.SetTLSConfig(tlsConfig)
+	}
+
+	client, err := mongo.Connect(context.Background(), clientOptions)
 	if err != nil {
 		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
@@ -63,4 +82,18 @@ func main() {
 	} else {
 		strategy.runTest(mongoCollection, testType, config, fetchDocumentIDs)
 	}
+}
+
+func createTlsConfigFromFile(tlsCertificate string) (*tls.Config, error) {
+	caCert, err := os.ReadFile(tlsCertificate)
+	if err != nil {
+		return nil, err
+	}
+
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	return &tls.Config{
+		RootCAs: caCertPool,
+	}, nil
 }

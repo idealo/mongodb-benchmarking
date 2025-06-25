@@ -171,10 +171,10 @@ func writeTempPEM(t *testing.T, pem string) string {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
+	defer tmp.Close()
 	if _, err := tmp.WriteString(pem); err != nil {
 		t.Fatalf("write failed: %v", err)
 	}
-	tmp.Close()
 	return tmp.Name()
 }
 

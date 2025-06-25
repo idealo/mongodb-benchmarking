@@ -96,14 +96,7 @@ func createTlsConfigFromFile(tlsCertificate string) (*tls.Config, error) {
 		return nil, fmt.Errorf("failed to parse certificate from %s", tlsCertificate)
 	}
 
-	// Extract hostname from MongoDB URI
-	uri, err := options.Client().ApplyURI(mongoURI).Validate()
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse MongoDB URI: %v", err)
-	}
-
 	return &tls.Config{
-		RootCAs:    caCertPool,
-		ServerName: uri.Host,
+		RootCAs: caCertPool,
 	}, nil
 }

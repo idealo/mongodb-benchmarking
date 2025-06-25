@@ -1,10 +1,19 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"math/big"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -154,4 +163,67 @@ func TestCountDocuments(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int64(10), count)
 	mockCollection.AssertExpectations(t)
+}
+
+// helper to create a temporary PEM file
+func writeTempPEM(t *testing.T, pem string) string {
+	tmp, err := os.CreateTemp(t.TempDir(), "ca_*.pem")
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	defer tmp.Close()
+	if _, err := tmp.WriteString(pem); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+	return tmp.Name()
+}
+
+// generateValidSelfSignedCert creates a minimal, valid self‑signed CA certificate and returns it as PEM.
+func generateValidSelfSignedCert(t *testing.T) string {
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	template := x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{Organization: []string{"Test CA"}},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		IsCA:                  true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		t.Fatalf("failed to create certificate: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: certDER}); err != nil {
+		t.Fatalf("failed to encode certificate: %v", err)
+	}
+	return buf.String()
+}
+
+func TestCreateTLSConfigFromFile_Success(t *testing.T) {
+	certPEM := generateValidSelfSignedCert(t)
+	path := writeTempPEM(t, certPEM)
+
+	cfg, err := createTLSConfigFromFile(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg == nil || cfg.RootCAs == nil {
+		t.Fatalf("expected non-nil TLS config with RootCAs")
+	}
+}
+
+func TestCreateTLSConfigFromFile_Invalid(t *testing.T) {
+	path := writeTempPEM(t, "not a cert")
+	_, err := createTLSConfigFromFile(path)
+	if err == nil {
+		t.Fatalf("expected error for invalid cert data")
+	}
 }

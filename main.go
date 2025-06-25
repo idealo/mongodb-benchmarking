@@ -29,7 +29,7 @@ func main() {
 	flag.IntVar(&threads, "threads", 10, "Number of threads for inserting, updating, upserting, or deleting documents")
 	flag.IntVar(&docCount, "docs", 1000, "Total number of documents to insert, update, upsert, or delete")
 	flag.StringVar(&uri, "uri", "mongodb://localhost:27017", "MongoDB URI")
-	flag.StringVar(&certificatePath, "cert", "", "Path to Tls certificate")
+	flag.StringVar(&certificatePath, "cert", "", "Path to TLS certificate")
 	flag.StringVar(&testType, "type", "insert", "Test type: insert, update, upsert, or delete")
 	flag.BoolVar(&runAll, "runAll", false, "Run all tests in order: insert, update, delete, upsert")
 	flag.IntVar(&duration, "duration", 0, "Duration in seconds to run the test")

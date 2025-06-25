@@ -1,4 +1,3 @@
-
 # MongoDB Benchmarking Tool - mongo-bench
 
 [![CodeQL Golang Pipeline](https://github.com/idealo/mongodb-benchmarking/actions/workflows/codeql.yml/badge.svg)](https://github.com/idealo/mongodb-benchmarking/actions/workflows/codeql.yml)
@@ -30,7 +29,7 @@ performance by simulating multiple threads performing operations in a MongoDB co
 After building the tool, run it with customizable parameters:
 
 ```bash
-./mongo-bench -threads <number_of_threads> -docs <number_of_documents> -uri <mongodb_uri> -type <test_type>
+./mongo-bench -threads <number_of_threads> -docs <number_of_documents> -uri <mongodb_uri> -tlsCert <path_to_ca_cert> -type <test_type>
 ```
 
 ### Parameters
@@ -41,6 +40,7 @@ After building the tool, run it with customizable parameters:
 - `-largeDocs`: Use large documents (2K) (default: false).
 - `-dropDb`: Drop the database before running the test (default: true).
 - `-uri`: MongoDB connection URI.
+- `-tlsCert`: Path to a PEM‑encoded CA certificate to enable TLS connections (optional).
 - `-type`: Type of test to run. Accepts `insert`, `update`, `delete`, `upsert`, or `runAll`:
   - `insert`: The tool will insert new documents.
   - `update`: The tool will update existing documents (requires that documents have been inserted in a prior run).
@@ -54,7 +54,7 @@ After building the tool, run it with customizable parameters:
 #### Insert Test:
 
 ```bash
-./mongo-bench -threads 10 -docs 100000 -uri mongodb://localhost:27017 -type insert
+./mongo-bench -threads 10 -docs 100000 -uri mongodb://localhost:27017 -tlsCert /path/to/ca.pem -type insert
 ```
 
 This command will insert 100,000 documents into MongoDB using 10 concurrent threads.
@@ -62,7 +62,7 @@ This command will insert 100,000 documents into MongoDB using 10 concurrent thre
 #### Update Test:
 
 ```bash
-./mongo-bench -threads 10 -docs 100000 -uri mongodb://localhost:27017 -type update
+./mongo-bench -threads 10 -docs 100000 -uri mongodb://localhost:27017 -tlsCert /path/to/ca.pem -type update
 ```
 
 This command will update the 100,000 documents previously inserted using 10 concurrent threads.
@@ -70,7 +70,7 @@ This command will update the 100,000 documents previously inserted using 10 conc
 #### Delete Test:
 
 ```bash
-./mongo-bench -threads 10 -docs 100000 -uri mongodb://localhost:27017 -type delete
+./mongo-bench -threads 10 -docs 100000 -uri mongodb://localhost:27017 -tlsCert /path/to/ca.pem -type delete
 ```
 
 This command will delete documents from MongoDB using 10 concurrent threads.
@@ -78,7 +78,7 @@ This command will delete documents from MongoDB using 10 concurrent threads.
 #### Upsert Test:
 
 ```bash
-./mongo-bench -threads 10 -docs 100000 -uri mongodb://localhost:27017 -type upsert
+./mongo-bench -threads 10 -docs 100000 -uri mongodb://localhost:27017 -tlsCert /path/to/ca.pem -type upsert
 ```
 
 This command will perform upserts on documents within a specified range, using 10 concurrent threads.
@@ -86,7 +86,7 @@ This command will perform upserts on documents within a specified range, using 1
 #### Run All Tests:
 
 ```bash
-./mongo-bench -threads 10 -docs 100000 -uri mongodb://localhost:27017 --runAll
+./mongo-bench -threads 10 -docs 100000 -uri mongodb://localhost:27017 -tlsCert /path/to/ca.pem --runAll
 ```
 
 This command will run the `insert`, `update`, `delete`, and `upsert` tests sequentially using 10 concurrent threads.

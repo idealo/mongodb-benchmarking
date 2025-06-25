@@ -42,7 +42,7 @@ func main() {
 
 	clientOptions := options.Client().ApplyURI(uri).SetMaxPoolSize(uint64(threads))
 
-	if len(certificatePath) != 0 {
+	if certificatePath != "" {
 		tlsConfig, err := createTLSConfigFromFile(certificatePath)
 		if err != nil {
 			log.Fatalf("Failed to create TLS config from %s: %v", certificatePath, err)

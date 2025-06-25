@@ -29,7 +29,7 @@ func main() {
 	flag.IntVar(&threads, "threads", 10, "Number of threads for inserting, updating, upserting, or deleting documents")
 	flag.IntVar(&docCount, "docs", 1000, "Total number of documents to insert, update, upsert, or delete")
 	flag.StringVar(&uri, "uri", "mongodb://localhost:27017", "MongoDB URI")
-	flag.StringVar(&certificatePath, "cert", "", "Path to TLS certificate")
+	flag.StringVar(&certificatePath, "tlsCert", "", "Path to TLS certificate")
 	flag.StringVar(&testType, "type", "insert", "Test type: insert, update, upsert, or delete")
 	flag.BoolVar(&runAll, "runAll", false, "Run all tests in order: insert, update, delete, upsert")
 	flag.IntVar(&duration, "duration", 0, "Duration in seconds to run the test")
@@ -43,9 +43,9 @@ func main() {
 	clientOptions := options.Client().ApplyURI(uri).SetMaxPoolSize(uint64(threads))
 
 	if len(certificatePath) != 0 {
-		tlsConfig, err := createTlsConfigFromFile(certificatePath)
+		tlsConfig, err := createTLSConfigFromFile(certificatePath)
 		if err != nil {
-			log.Fatalf("Failed to create tls config from %s: %v", certificatePath, err)
+			log.Fatalf("Failed to create TLS config from %s: %v", certificatePath, err)
 		}
 
 		clientOptions = clientOptions.SetTLSConfig(tlsConfig)
@@ -85,7 +85,7 @@ func main() {
 	}
 }
 
-func createTlsConfigFromFile(tlsCertificate string) (*tls.Config, error) {
+func createTLSConfigFromFile(tlsCertificate string) (*tls.Config, error) {
 	caCert, err := os.ReadFile(tlsCertificate)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func createTlsConfigFromFile(tlsCertificate string) (*tls.Config, error) {
 
 	caCertPool := x509.NewCertPool()
 	if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
-		return nil, fmt.Errorf("failed to parse certificate from %s", tlsCertificate)
+		return nil, fmt.Errorf("failed to parse TLS certificate from %s", tlsCertificate)
 	}
 
 	return &tls.Config{

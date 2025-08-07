@@ -5,9 +5,9 @@ metadata:
   description: mongo-bench is a high-performance benchmarking tool written in Golang designed to test and measure MongoDB insert, update, delete, and upsert rates under configurable conditions.
   annotations:
     github.com/project-slug: idealo/mongodb-benchmarking
-    github.com/team-slug: idealo/persistence
+    github.com/team-slug: idealo/cloud-core
 spec:
   type: service
   lifecycle: production
-  owner: group:persistence
+  owner: group:cloud-core
   system: database-management-toolset

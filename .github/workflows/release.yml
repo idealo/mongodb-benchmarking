@@ -30,7 +30,7 @@ jobs:
         if: steps.semantic.outputs.new_release_published == 'true'
       - name: Setup Go
         if: steps.semantic.outputs.new_release_published == 'true'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '>=1.22.1'
           cache: true

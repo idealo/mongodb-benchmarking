@@ -1,4 +1,4 @@
 mongo-bench
 .idea
 *.csv
-*.bak
+*.bak.cursor
